@@ -186,12 +186,23 @@ func TestBuildEndpoint(t *testing.T) {
 		DockerDefaultProtocol: "https",
 		LabelConfig:           "gatus.endpoint",
 		LabelEnabled:          "gatus.enabled",
+		LabelGroup:            "gatus.group",
+	}
+
+	cfgWithGroup := &config.Config{
+		DefaultInterval:       time.Minute,
+		DockerDefaultProtocol: "https",
+		DockerDefaultGroup:    "Docker",
+		LabelConfig:           "gatus.endpoint",
+		LabelEnabled:          "gatus.enabled",
+		LabelGroup:            "gatus.group",
 	}
 
 	tests := []struct {
 		name      string
 		container string
 		labels    map[string]string
+		cfg       *config.Config
 		wantName  string
 		wantURL   string
 		wantGroup string
@@ -203,6 +214,7 @@ func TestBuildEndpoint(t *testing.T) {
 			labels: map[string]string{
 				"traefik.http.routers.myapp.rule": "Host(`myapp.example.com`)",
 			},
+			cfg:       cfg,
 			wantName:  "myapp",
 			wantURL:   "https://myapp.example.com",
 			wantConds: []string{"[STATUS] == 200"},
@@ -213,6 +225,7 @@ func TestBuildEndpoint(t *testing.T) {
 			labels: map[string]string{
 				"traefik.http.routers.myapp.rule": "Host(`myapp.example.com`)",
 			},
+			cfg:       cfg,
 			wantName:  "myapp",
 			wantURL:   "https://myapp.example.com",
 			wantConds: []string{"[STATUS] == 200"},
@@ -224,6 +237,7 @@ func TestBuildEndpoint(t *testing.T) {
 				"traefik.http.routers.myapp.rule": "Host(`myapp.example.com`)",
 				"gatus.endpoint":                  "group: infrastructure\nconditions:\n  - \"[STATUS] == 200\"\n  - \"[RESPONSE_TIME] < 1000\"",
 			},
+			cfg:       cfg,
 			wantName:  "myapp",
 			wantURL:   "https://myapp.example.com",
 			wantGroup: "infrastructure",
@@ -235,15 +249,85 @@ func TestBuildEndpoint(t *testing.T) {
 			labels: map[string]string{
 				"gatus.url": "https://custom.example.com/health",
 			},
+			cfg:       cfg,
 			wantName:  "myapp",
 			wantURL:   "https://custom.example.com/health",
+			wantConds: []string{"[STATUS] == 200"},
+		},
+		{
+			name:      "default group from config",
+			container: "myapp",
+			labels: map[string]string{
+				"traefik.http.routers.myapp.rule": "Host(`myapp.example.com`)",
+			},
+			cfg:       cfgWithGroup,
+			wantName:  "myapp",
+			wantURL:   "https://myapp.example.com",
+			wantGroup: "Docker",
+			wantConds: []string{"[STATUS] == 200"},
+		},
+		{
+			name:      "per-container group label overrides default",
+			container: "myapp",
+			labels: map[string]string{
+				"traefik.http.routers.myapp.rule": "Host(`myapp.example.com`)",
+				"gatus.group":                     "infrastructure",
+			},
+			cfg:       cfgWithGroup,
+			wantName:  "myapp",
+			wantURL:   "https://myapp.example.com",
+			wantGroup: "infrastructure",
+			wantConds: []string{"[STATUS] == 200"},
+		},
+		{
+			name:      "per-container group label without default",
+			container: "myapp",
+			labels: map[string]string{
+				"traefik.http.routers.myapp.rule": "Host(`myapp.example.com`)",
+				"gatus.group":                     "web-apps",
+			},
+			cfg:       cfg,
+			wantName:  "myapp",
+			wantURL:   "https://myapp.example.com",
+			wantGroup: "web-apps",
+			wantConds: []string{"[STATUS] == 200"},
+		},
+		{
+			name:      "template group overrides default but label overrides template",
+			container: "myapp",
+			labels: map[string]string{
+				"traefik.http.routers.myapp.rule": "Host(`myapp.example.com`)",
+				"gatus.endpoint":                  "group: from-template",
+				"gatus.group":                     "from-label",
+			},
+			cfg:       cfgWithGroup,
+			wantName:  "myapp",
+			wantURL:   "https://myapp.example.com",
+			wantGroup: "from-label",
+			wantConds: []string{"[STATUS] == 200"},
+		},
+		{
+			name:      "template group overrides default when no label",
+			container: "myapp",
+			labels: map[string]string{
+				"traefik.http.routers.myapp.rule": "Host(`myapp.example.com`)",
+				"gatus.endpoint":                  "group: from-template",
+			},
+			cfg:       cfgWithGroup,
+			wantName:  "myapp",
+			wantURL:   "https://myapp.example.com",
+			wantGroup: "from-template",
 			wantConds: []string{"[STATUS] == 200"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := buildEndpoint(tt.container, tt.labels, cfg)
+			testCfg := tt.cfg
+			if testCfg == nil {
+				testCfg = cfg
+			}
+			e := buildEndpoint(tt.container, tt.labels, testCfg)
 			if e.Name != tt.wantName {
 				t.Errorf("Name = %q, want %q", e.Name, tt.wantName)
 			}

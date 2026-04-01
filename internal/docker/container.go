@@ -95,6 +95,7 @@ func buildEndpoint(name string, labels map[string]string, cfg *config.Config) *e
 
 	e := &endpoint.Endpoint{
 		Name:       name,
+		Group:      cfg.DockerDefaultGroup,
 		URL:        url,
 		Interval:   cfg.DefaultInterval.String(),
 		Conditions: []string{"[STATUS] == 200"},
@@ -106,6 +107,11 @@ func buildEndpoint(name string, labels map[string]string, cfg *config.Config) *e
 		if err := yaml.Unmarshal([]byte(templateYAML), &templateData); err == nil {
 			e.ApplyTemplate(templateData)
 		}
+	}
+
+	// Per-container group label takes highest priority
+	if group, ok := labels[cfg.LabelGroup]; ok && group != "" {
+		e.Group = group
 	}
 
 	return e
