@@ -9,8 +9,10 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/docker/docker/client"
 	"github.com/home-operations/gatus-sidecar/internal/config"
 	"github.com/home-operations/gatus-sidecar/internal/controller"
+	"github.com/home-operations/gatus-sidecar/internal/docker"
 	"github.com/home-operations/gatus-sidecar/internal/resources/httproute"
 	"github.com/home-operations/gatus-sidecar/internal/resources/ingress"
 	"github.com/home-operations/gatus-sidecar/internal/resources/ingressroute"
@@ -26,19 +28,52 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
+	switch cfg.Mode {
+	case "docker":
+		if err := runDocker(ctx, cfg); err != nil {
+			slog.Error("Docker mode failed", "error", err)
+			os.Exit(1)
+		}
+	default:
+		if err := runKubernetes(ctx, cfg); err != nil {
+			slog.Error("Kubernetes mode failed", "error", err)
+			os.Exit(1)
+		}
+	}
+
+	slog.Info("All controllers have finished successfully")
+}
+
+func runDocker(ctx context.Context, cfg *config.Config) error {
+	opts := []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation()}
+	if cfg.DockerHost != "" {
+		opts = append(opts, client.WithHost(cfg.DockerHost))
+	}
+
+	dockerClient, err := client.NewClientWithOpts(opts...)
+	if err != nil {
+		return fmt.Errorf("create docker client: %w", err)
+	}
+	defer dockerClient.Close()
+
+	stateManager := state.NewManager(cfg.Output)
+	ctrl := docker.New(stateManager, dockerClient)
+
+	slog.Info("starting in docker mode")
+	return ctrl.Run(ctx, cfg)
+}
+
+func runKubernetes(ctx context.Context, cfg *config.Config) error {
 	restCfg, err := getKubeConfig()
 	if err != nil {
-		slog.Error("get kubernetes config", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("get kubernetes config: %w", err)
 	}
 
 	dc, err := dynamic.NewForConfig(restCfg)
 	if err != nil {
-		slog.Error("create dynamic client", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("create dynamic client: %w", err)
 	}
 
-	// Create a single shared state manager
 	stateManager := state.NewManager(cfg.Output)
 
 	// Initialize controllers slice
@@ -64,16 +99,11 @@ func main() {
 	// If no controllers are enabled, log a warning and exit
 	if len(controllers) == 0 {
 		slog.Warn("No controllers enabled. Exiting.")
-		return
+		return nil
 	}
 
 	// Run all controllers concurrently
-	if err := runControllers(ctx, cfg, controllers); err != nil {
-		slog.Error("Controller execution failed", "error", err)
-		os.Exit(1)
-	}
-
-	slog.Info("All controllers have finished successfully")
+	return runControllers(ctx, cfg, controllers)
 }
 
 func runControllers(ctx context.Context, cfg *config.Config, controllers []*controller.Controller) error {
