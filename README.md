@@ -67,8 +67,10 @@ gatus-sidecar [options]
 | `--mode` | `kubernetes` | Operating mode: `kubernetes` or `docker` |
 | `--docker-host` | `""` | Docker host (uses `DOCKER_HOST` env / default socket if empty) |
 | `--docker-default-protocol` | `https` | Default protocol for Docker container URLs |
+| `--docker-default-group` | `""` | Default group name for Docker container endpoints (empty to disable auto-grouping) |
 | `--label-config` | `gatus.endpoint` | Docker label key for YAML template override |
 | `--label-enabled` | `gatus.enabled` | Docker label key for enabling/disabling container processing |
+| `--label-group` | `gatus.group` | Docker label key for per-container group name |
 
 ### 🌐 HTTPRoute Mode
 
@@ -309,6 +311,7 @@ In Docker mode, container labels control endpoint generation:
 | `traefik.http.routers.<name>.entrypoints` | If set to `websecure` or `https`, forces HTTPS |
 | `gatus.url` | Explicit URL (overrides Traefik label extraction) |
 | `gatus.enabled` | Set to `false` or `0` to exclude the container |
+| `gatus.group` | Group name for this container (overrides `--docker-default-group` and any `group` in `gatus.endpoint`) |
 | `gatus.endpoint` | YAML template to override default endpoint config (same format as the Kubernetes annotation) |
 
 ### 🏷️ Docker Label Examples
@@ -341,6 +344,18 @@ services:
           - "[RESPONSE_TIME] < 1000"
 ```
 
+Container with per-container group label:
+
+```yaml
+services:
+  myapp:
+    image: myapp:latest
+    labels:
+      traefik.http.routers.myapp.rule: "Host(`myapp.example.com`)"
+      traefik.http.routers.myapp.tls: "true"
+      gatus.group: "web-apps"
+```
+
 Container with explicit URL (no Traefik needed):
 
 ```yaml
@@ -368,6 +383,7 @@ services:
     image: ghcr.io/home-operations/gatus-sidecar:latest
     command:
       - --mode=docker
+      - --docker-default-group=Docker
       - --output=/config/gatus-sidecar.yaml
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
