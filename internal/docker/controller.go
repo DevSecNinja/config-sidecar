@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
@@ -13,9 +14,16 @@ import (
 	"github.com/home-operations/gatus-sidecar/internal/state"
 )
 
+// dockerClient is the subset of the Docker API used by the controller.
+type dockerClient interface {
+	ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error)
+	ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error)
+	Events(ctx context.Context, options events.ListOptions) (<-chan events.Message, <-chan error)
+}
+
 // Controller watches Docker containers and generates Gatus endpoints.
 type Controller struct {
-	client       *client.Client
+	client       dockerClient
 	stateManager *state.Manager
 }
 
@@ -76,8 +84,30 @@ func (c *Controller) watchLoop(ctx context.Context, cfg *config.Config) error {
 	f.Add("event", "die")
 	f.Add("event", "destroy")
 
-	eventCh, errCh := c.client.Events(ctx, events.ListOptions{Filters: f})
+	for {
+		if err := c.watchEvents(ctx, cfg, f); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			slog.Warn("docker event stream error, reconnecting in 5s", "error", err)
 
+			if syncErr := c.initialSync(ctx, cfg); syncErr != nil {
+				slog.Error("re-sync after event stream error failed", "error", syncErr)
+			}
+
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(5 * time.Second):
+			}
+			continue
+		}
+		return nil
+	}
+}
+
+func (c *Controller) watchEvents(ctx context.Context, cfg *config.Config, f filters.Args) error {
+	eventCh, errCh := c.client.Events(ctx, events.ListOptions{Filters: f})
 	slog.Info("watching docker events")
 
 	for {
