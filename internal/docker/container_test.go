@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/home-operations/gatus-sidecar/internal/config"
+	"github.com/home-operations/gatus-sidecar/internal/endpoint"
 )
 
 func TestExtractURL(t *testing.T) {
@@ -348,4 +349,211 @@ func TestBuildEndpoint(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestApplyGatusLabels(t *testing.T) {
+	cfg := &config.Config{
+		LabelConfig:  "gatus.endpoint",
+		LabelEnabled: "gatus.enabled",
+		LabelGroup:   "gatus.group",
+	}
+
+	t.Run("scalar labels set endpoint fields", func(t *testing.T) {
+		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com", Interval: "1m"}
+		labels := map[string]string{
+			"gatus.interval": "30s",
+			"gatus.method":   "POST",
+			"gatus.body":     `{"key":"val"}`,
+			"gatus.graphql":  "true",
+		}
+		applyGatusLabels(e, labels, cfg)
+		if e.Interval != "30s" {
+			t.Errorf("Interval = %q, want %q", e.Interval, "30s")
+		}
+		if e.Method != "POST" {
+			t.Errorf("Method = %q, want %q", e.Method, "POST")
+		}
+		if e.Body != `{"key":"val"}` {
+			t.Errorf("Body = %q, want %q", e.Body, `{"key":"val"}`)
+		}
+		if !e.GraphQL {
+			t.Errorf("GraphQL = false, want true")
+		}
+	})
+
+	t.Run("graphql false when not true", func(t *testing.T) {
+		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com", GraphQL: true}
+		applyGatusLabels(e, map[string]string{"gatus.graphql": "false"}, cfg)
+		if e.GraphQL {
+			t.Errorf("GraphQL = true, want false")
+		}
+	})
+
+	t.Run("gatus.conditions JSON list", func(t *testing.T) {
+		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com"}
+		applyGatusLabels(e, map[string]string{
+			"gatus.conditions": `["[STATUS] == 200","[RESPONSE_TIME] < 1000"]`,
+		}, cfg)
+		want := []string{"[STATUS] == 200", "[RESPONSE_TIME] < 1000"}
+		if len(e.Conditions) != len(want) {
+			t.Fatalf("Conditions = %v, want %v", e.Conditions, want)
+		}
+		for i, c := range e.Conditions {
+			if c != want[i] {
+				t.Errorf("Conditions[%d] = %q, want %q", i, c, want[i])
+			}
+		}
+	})
+
+	t.Run("gatus.conditions invalid JSON does not change field", func(t *testing.T) {
+		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com", Conditions: []string{"[STATUS] == 200"}}
+		applyGatusLabels(e, map[string]string{"gatus.conditions": "not-json"}, cfg)
+		if len(e.Conditions) != 1 || e.Conditions[0] != "[STATUS] == 200" {
+			t.Errorf("Conditions unexpectedly changed: %v", e.Conditions)
+		}
+	})
+
+	t.Run("gatus.alerts JSON list of objects", func(t *testing.T) {
+		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com"}
+		applyGatusLabels(e, map[string]string{
+			"gatus.alerts": `[{"type":"email"},{"type":"custom"}]`,
+		}, cfg)
+		if len(e.Alerts) != 2 {
+			t.Fatalf("Alerts len = %d, want 2", len(e.Alerts))
+		}
+		if e.Alerts[0]["type"] != "email" {
+			t.Errorf("Alerts[0].type = %v, want email", e.Alerts[0]["type"])
+		}
+	})
+
+	t.Run("gatus.client JSON object", func(t *testing.T) {
+		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com"}
+		applyGatusLabels(e, map[string]string{
+			"gatus.client": `{"ignore-redirect":true}`,
+		}, cfg)
+		if e.Client == nil {
+			t.Fatal("Client is nil")
+		}
+		if e.Client["ignore-redirect"] != true {
+			t.Errorf("Client[ignore-redirect] = %v, want true", e.Client["ignore-redirect"])
+		}
+	})
+
+	t.Run("gatus.headers dot-separated keys assemble headers map", func(t *testing.T) {
+		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com"}
+		applyGatusLabels(e, map[string]string{
+			"gatus.headers.Host":          "sonarr.example.com",
+			"gatus.headers.Authorization": "Bearer token123",
+		}, cfg)
+		if e.Headers == nil {
+			t.Fatal("Headers is nil")
+		}
+		if e.Headers["Host"] != "sonarr.example.com" {
+			t.Errorf("Headers[Host] = %q, want %q", e.Headers["Host"], "sonarr.example.com")
+		}
+		if e.Headers["Authorization"] != "Bearer token123" {
+			t.Errorf("Headers[Authorization] = %q, want %q", e.Headers["Authorization"], "Bearer token123")
+		}
+	})
+
+	t.Run("gatus.headers merges into existing headers", func(t *testing.T) {
+		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com", Headers: map[string]string{"X-Existing": "yes"}}
+		applyGatusLabels(e, map[string]string{"gatus.headers.Host": "example.com"}, cfg)
+		if e.Headers["X-Existing"] != "yes" {
+			t.Errorf("existing header lost: %v", e.Headers)
+		}
+		if e.Headers["Host"] != "example.com" {
+			t.Errorf("Headers[Host] = %q, want %q", e.Headers["Host"], "example.com")
+		}
+	})
+
+	t.Run("reserved labels are skipped without warning", func(t *testing.T) {
+		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com", Interval: "1m"}
+		// These are reserved – none should be misinterpreted as unknown labels.
+		labels := map[string]string{
+			"gatus.url":      "https://example.com",
+			"gatus.enabled":  "true",
+			"gatus.group":    "mygroup",
+			"gatus.endpoint": "interval: 5m",
+		}
+		applyGatusLabels(e, labels, cfg)
+		// Interval must NOT be set from the blob (that's handled by buildEndpoint, not applyGatusLabels)
+		if e.Interval != "1m" {
+			t.Errorf("Interval unexpectedly changed to %q", e.Interval)
+		}
+	})
+
+	t.Run("individual labels override blob values", func(t *testing.T) {
+		blobCfg := &config.Config{
+			DefaultInterval: time.Minute,
+			LabelConfig:     "gatus.endpoint",
+			LabelEnabled:    "gatus.enabled",
+			LabelGroup:      "gatus.group",
+		}
+		e := buildEndpoint("app", map[string]string{
+			"gatus.url":      "https://example.com",
+			"gatus.endpoint": "interval: 5m\nmethod: DELETE",
+			"gatus.interval": "10s",
+		}, blobCfg)
+		// Individual gatus.interval overrides the blob's interval
+		if e.Interval != "10s" {
+			t.Errorf("Interval = %q, want %q", e.Interval, "10s")
+		}
+		// Method from blob is still applied (individual label did not override it)
+		if e.Method != "DELETE" {
+			t.Errorf("Method = %q, want %q", e.Method, "DELETE")
+		}
+	})
+
+	t.Run("gatus.dns JSON object", func(t *testing.T) {
+		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com"}
+		applyGatusLabels(e, map[string]string{
+			"gatus.dns": `{"query-name":"example.com","query-type":"A"}`,
+		}, cfg)
+		if e.DNS == nil {
+			t.Fatal("DNS is nil")
+		}
+		if e.DNS["query-name"] != "example.com" {
+			t.Errorf("DNS[query-name] = %v, want example.com", e.DNS["query-name"])
+		}
+	})
+
+	t.Run("gatus.ui JSON object", func(t *testing.T) {
+		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com"}
+		applyGatusLabels(e, map[string]string{
+			"gatus.ui": `{"hide-url":true}`,
+		}, cfg)
+		if e.UI == nil {
+			t.Fatal("UI is nil")
+		}
+		if e.UI["hide-url"] != true {
+			t.Errorf("UI[hide-url] = %v, want true", e.UI["hide-url"])
+		}
+	})
+
+	t.Run("gatus.ssh JSON object", func(t *testing.T) {
+		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com"}
+		applyGatusLabels(e, map[string]string{
+			"gatus.ssh": `{"username":"admin"}`,
+		}, cfg)
+		if e.SSH == nil {
+			t.Fatal("SSH is nil")
+		}
+		if e.SSH["username"] != "admin" {
+			t.Errorf("SSH[username] = %v, want admin", e.SSH["username"])
+		}
+	})
+
+	t.Run("gatus.maintenance JSON list of objects", func(t *testing.T) {
+		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com"}
+		applyGatusLabels(e, map[string]string{
+			"gatus.maintenance": `[{"start":"23:00","duration":"1h"}]`,
+		}, cfg)
+		if len(e.Maintenance) != 1 {
+			t.Fatalf("Maintenance len = %d, want 1", len(e.Maintenance))
+		}
+		if e.Maintenance[0]["start"] != "23:00" {
+			t.Errorf("Maintenance[0].start = %v, want 23:00", e.Maintenance[0]["start"])
+		}
+	})
 }

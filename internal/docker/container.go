@@ -1,6 +1,8 @@
 package docker
 
 import (
+	"encoding/json"
+	"log/slog"
 	"regexp"
 	"strings"
 
@@ -101,13 +103,17 @@ func buildEndpoint(name string, labels map[string]string, cfg *config.Config) *e
 		Conditions: []string{"[STATUS] == 200"},
 	}
 
-	// Apply template override from label
+	// Handle deprecated gatus.endpoint blob label
 	if templateYAML, ok := labels[cfg.LabelConfig]; ok && templateYAML != "" {
+		slog.Warn("gatus.endpoint label is deprecated; use individual gatus.* labels instead", "container", name)
 		var templateData map[string]any
 		if err := yaml.Unmarshal([]byte(templateYAML), &templateData); err == nil {
 			e.ApplyTemplate(templateData)
 		}
 	}
+
+	// Apply individual gatus.* labels (override any blob-set values)
+	applyGatusLabels(e, labels, cfg)
 
 	// Per-container group label takes highest priority
 	if group, ok := labels[cfg.LabelGroup]; ok && group != "" {
@@ -115,4 +121,103 @@ func buildEndpoint(name string, labels map[string]string, cfg *config.Config) *e
 	}
 
 	return e
+}
+
+// applyGatusLabels applies individual gatus.* labels to the endpoint.
+// Labels handled elsewhere (gatus.url, gatus.enabled, gatus.group, gatus.endpoint) are skipped.
+func applyGatusLabels(e *endpoint.Endpoint, labels map[string]string, cfg *config.Config) {
+	const prefix = "gatus."
+	const headersPrefix = "gatus.headers."
+
+	// Labels handled elsewhere – skip them in this scan.
+	reserved := map[string]bool{
+		"gatus.url":      true,
+		cfg.LabelEnabled: true, // e.g. "gatus.enabled"
+		cfg.LabelGroup:   true, // e.g. "gatus.group"
+		cfg.LabelConfig:  true, // e.g. "gatus.endpoint" (deprecated blob)
+	}
+
+	for key, value := range labels {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		if reserved[key] {
+			continue
+		}
+
+		// Handle gatus.headers.* – assemble the headers map from dot-separated keys.
+		if strings.HasPrefix(key, headersPrefix) {
+			headerKey := strings.TrimPrefix(key, headersPrefix)
+			if headerKey != "" {
+				if e.Headers == nil {
+					e.Headers = make(map[string]string)
+				}
+				e.Headers[headerKey] = value
+			}
+			continue
+		}
+
+		suffix := strings.TrimPrefix(key, prefix)
+		switch suffix {
+		case "interval":
+			e.Interval = value
+		case "method":
+			e.Method = value
+		case "body":
+			e.Body = value
+		case "graphql":
+			e.GraphQL = value == "true"
+		case "conditions":
+			var conditions []string
+			if err := json.Unmarshal([]byte(value), &conditions); err != nil {
+				slog.Warn("failed to parse gatus label as JSON", "label", key, "error", err)
+			} else {
+				e.Conditions = conditions
+			}
+		case "alerts":
+			var alerts []map[string]any
+			if err := json.Unmarshal([]byte(value), &alerts); err != nil {
+				slog.Warn("failed to parse gatus label as JSON", "label", key, "error", err)
+			} else {
+				e.Alerts = alerts
+			}
+		case "client":
+			var client map[string]any
+			if err := json.Unmarshal([]byte(value), &client); err != nil {
+				slog.Warn("failed to parse gatus label as JSON", "label", key, "error", err)
+			} else {
+				e.Client = client
+			}
+		case "dns":
+			var dns map[string]any
+			if err := json.Unmarshal([]byte(value), &dns); err != nil {
+				slog.Warn("failed to parse gatus label as JSON", "label", key, "error", err)
+			} else {
+				e.DNS = dns
+			}
+		case "ui":
+			var ui map[string]any
+			if err := json.Unmarshal([]byte(value), &ui); err != nil {
+				slog.Warn("failed to parse gatus label as JSON", "label", key, "error", err)
+			} else {
+				e.UI = ui
+			}
+		case "ssh":
+			var ssh map[string]any
+			if err := json.Unmarshal([]byte(value), &ssh); err != nil {
+				slog.Warn("failed to parse gatus label as JSON", "label", key, "error", err)
+			} else {
+				e.SSH = ssh
+			}
+		case "maintenance":
+			var maintenance []map[string]any
+			if err := json.Unmarshal([]byte(value), &maintenance); err != nil {
+				slog.Warn("failed to parse gatus label as JSON", "label", key, "error", err)
+			} else {
+				e.Maintenance = maintenance
+			}
+		default:
+			slog.Warn("ignoring unknown gatus label", "label", key)
+		}
+	}
 }
