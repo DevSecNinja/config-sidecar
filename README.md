@@ -1,23 +1,29 @@
 # 🚀 gatus-sidecar
 
-A powerful Kubernetes sidecar that automatically generates [Gatus](https://github.com/TwiN/gatus) monitoring configuration from Kubernetes resources including Ingress, Gateway API HTTPRoute, and Service resources. ⚡
+A powerful sidecar that automatically generates [Gatus](https://github.com/TwiN/gatus) monitoring configuration from Kubernetes resources (Ingress, Gateway API HTTPRoute, Service) or Docker containers (via Traefik labels). ⚡
 
 ## 🔍 Overview
 
-gatus-sidecar is a lightweight Go application designed to run as a sidecar container alongside Gatus. It watches multiple types of Kubernetes resources and automatically generates Gatus endpoint configurations, eliminating the need to manually maintain monitoring configurations for your web services and infrastructure. 🎯
+gatus-sidecar is a lightweight Go application designed to run alongside Gatus. It supports two operating modes:
+
+- **Kubernetes mode** (default): Watches Kubernetes resources and automatically generates Gatus endpoint configurations
+- **Docker mode**: Watches Docker containers and generates endpoints from Traefik labels or explicit `gatus.url` labels
+
+This eliminates the need to manually maintain monitoring configurations for your web services and infrastructure. 🎯
 
 ## ✨ Features
 
-- **🔄 Multi-Resource Support**: Supports Kubernetes Ingress, Gateway API HTTPRoute, and Service resources
+- **🔄 Multi-Resource Support**: Supports Kubernetes Ingress, Gateway API HTTPRoute, Service resources, and Docker containers
+- **🐳 Docker Mode**: Watches Docker containers and generates endpoints from Traefik labels
 - **🔍 Automatic Discovery**: Watches for resource changes and dynamically updates monitoring configurations  
 - **🎛️ Flexible Filtering**: Filter resources by namespace, gateway name, or ingress class
-- **📋 Template Support**: Override default configurations using Kubernetes annotations
+- **📋 Template Support**: Override default configurations using Kubernetes annotations or Docker labels
 - **🏗️ Gateway Inheritance**: HTTPRoutes automatically inherit annotations from their parent gateway
 - **🏗️ Ingress Inheritance**: Ingress automatically inherit annotations from their parent ingress class
 - **👥 Auto-Grouping**: Automatically group endpoints by namespace (Services) or gateway/ingress class (HTTPRoutes/Ingresses)
 - **⚡ Zero Downtime**: Hot-reload configurations without restarting Gatus
-- **🪶 Lightweight**: Minimal resource footprint with efficient Kubernetes API watching
-- **🎯 Selective Processing**: Enable/disable monitoring per resource with annotations
+- **🪶 Lightweight**: Minimal resource footprint with efficient API watching
+- **🎯 Selective Processing**: Enable/disable monitoring per resource with annotations or labels
 
 ## 📦 Installation
 
@@ -58,6 +64,13 @@ gatus-sidecar [options]
 | `--default-interval` | `1m` | Default interval value for endpoints |
 | `--annotation-config` | `gatus.home-operations.com/endpoint` | Annotation key for YAML config override |
 | `--annotation-enabled` | `gatus.home-operations.com/enabled` | Annotation key for enabling/disabling resource processing |
+| `--mode` | `kubernetes` | Operating mode: `kubernetes` or `docker` |
+| `--docker-host` | `""` | Docker host (uses `DOCKER_HOST` env / default socket if empty) |
+| `--docker-default-protocol` | `https` | Default protocol for Docker container URLs |
+| `--docker-default-group` | `""` | Default group name for Docker container endpoints (empty to disable auto-grouping) |
+| `--label-config` | `gatus.endpoint` | Docker label key for YAML template override |
+| `--label-enabled` | `gatus.enabled` | Docker label key for enabling/disabling container processing |
+| `--label-group` | `gatus.group` | Docker label key for per-container group name |
 
 ### 🌐 HTTPRoute Mode
 
@@ -90,6 +103,16 @@ Monitor all resource types simultaneously:
 ```bash
 gatus-sidecar --auto-httproute --auto-ingress --auto-service
 ```
+
+### 🐳 Docker Mode
+
+Monitor Docker containers with Traefik labels:
+
+```bash
+gatus-sidecar --mode=docker --output=/config/gatus-sidecar.yaml
+```
+
+Containers with Traefik router labels (`traefik.http.routers.*.rule`) are automatically discovered. Containers without Traefik labels are ignored unless they have an explicit `gatus.url` label. Use `gatus.enabled=false` to opt out a specific container.
 
 ## ⚙️ Configuration
 
@@ -277,7 +300,105 @@ spec:
   # ... rest of Ingress spec
 ```
 
+## � Docker Labels
+
+In Docker mode, container labels control endpoint generation:
+
+| Label | Description |
+|-------|-------------|
+| `traefik.http.routers.<name>.rule` | Traefik router rule — `Host(\`hostname\`)` is parsed to extract the URL |
+| `traefik.http.routers.<name>.tls` | Set to `true` to force HTTPS |
+| `traefik.http.routers.<name>.entrypoints` | If set to `websecure` or `https`, forces HTTPS |
+| `gatus.url` | Explicit URL (overrides Traefik label extraction) |
+| `gatus.enabled` | Set to `false` or `0` to exclude the container |
+| `gatus.group` | Group name for this container (overrides `--docker-default-group` and any `group` in `gatus.endpoint`) |
+| `gatus.endpoint` | YAML template to override default endpoint config (same format as the Kubernetes annotation) |
+
+### 🏷️ Docker Label Examples
+
+Basic container with Traefik labels (auto-detected):
+
+```yaml
+services:
+  myapp:
+    image: myapp:latest
+    labels:
+      traefik.http.routers.myapp.rule: "Host(`myapp.example.com`)"
+      traefik.http.routers.myapp.tls: "true"
+```
+
+Container with custom endpoint config:
+
+```yaml
+services:
+  myapp:
+    image: myapp:latest
+    labels:
+      traefik.http.routers.myapp.rule: "Host(`myapp.example.com`)"
+      traefik.http.routers.myapp.tls: "true"
+      gatus.endpoint: |
+        group: infrastructure
+        interval: 30s
+        conditions:
+          - "[STATUS] == 200"
+          - "[RESPONSE_TIME] < 1000"
+```
+
+Container with per-container group label:
+
+```yaml
+services:
+  myapp:
+    image: myapp:latest
+    labels:
+      traefik.http.routers.myapp.rule: "Host(`myapp.example.com`)"
+      traefik.http.routers.myapp.tls: "true"
+      gatus.group: "web-apps"
+```
+
+Container with explicit URL (no Traefik needed):
+
+```yaml
+services:
+  myapp:
+    image: myapp:latest
+    labels:
+      gatus.url: "https://myapp.example.com/health"
+```
+
 ## 🚀 Deployment Examples
+
+### 🐳 Docker Compose with Gatus
+
+```yaml
+services:
+  gatus:
+    image: ghcr.io/twin/gatus:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - gatus-config:/config
+
+  gatus-sidecar:
+    image: ghcr.io/home-operations/gatus-sidecar:latest
+    command:
+      - --mode=docker
+      - --docker-default-group=Docker
+      - --output=/config/gatus-sidecar.yaml
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - gatus-config:/config
+
+  # Example monitored service
+  whoami:
+    image: traefik/whoami
+    labels:
+      traefik.http.routers.whoami.rule: "Host(`whoami.example.com`)"
+      traefik.http.routers.whoami.tls: "true"
+
+volumes:
+  gatus-config:
+```
 
 ### ☸️ Kubernetes Deployment with Gatus
 
@@ -403,8 +524,9 @@ spec:
 ### 📋 Prerequisites
 
 - Go 1.25 or later
-- Kubernetes cluster access
-- kubectl configured
+- Kubernetes cluster access (for Kubernetes mode)
+- kubectl configured (for Kubernetes mode)
+- Docker daemon access (for Docker mode)
 - Access to Gateway API CRDs (if using HTTPRoute monitoring)
 
 ### 🏗️ Building
@@ -421,7 +543,20 @@ The project includes comprehensive controller logic for handling multiple resour
 - **HTTPRoute Controller**: Monitors Gateway API HTTPRoute resources with parent Gateway annotation inheritance
 - **Ingress Controller**: Monitors traditional Kubernetes Ingress resources with parent IngressClass annotation inheritance
 - **Service Controller**: Monitors Kubernetes Service resources for infrastructure monitoring
+- **Docker Controller**: Monitors Docker containers via Traefik labels and explicit `gatus.url` labels
 - **State Manager**: Centralizes endpoint state management and YAML generation
+
+Run unit tests:
+
+```bash
+go test ./...
+```
+
+Run integration tests (requires a running Docker daemon):
+
+```bash
+go test -tags=integration -v ./internal/docker/
+```
 
 ### 🛠️ Local Development
 
@@ -443,21 +578,27 @@ go build -o gatus-sidecar cmd/root.go
 ```text
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Kubernetes    │    │  gatus-sidecar   │    │     Gatus       │
-│   API Server    │◄───┤   Controllers    ├───►│   Monitoring    │
-│                 │    │                  │    │                 │
-│ ▪ HTTPRoutes    │    │ ▪ Watches K8s    │    │ ▪ Reads config  │
-│ ▪ Gateways      │    │ ▪ Merges configs │    │ ▪ Monitors URLs │
-│ ▪ Ingresses     │    │ ▪ Generates YAML │    │ ▪ Sends alerts  │
-│ ▪ Services      │    │ ▪ Writes files   │    │ ▪ Health checks │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+│   API Server    │◄───┤                  ├───►│   Monitoring    │
+│                 │    │  Mode:           │    │                 │
+│ ▪ HTTPRoutes    │    │  ▪ kubernetes    │    │ ▪ Reads config  │
+│ ▪ Gateways      │    │  ▪ docker        │    │ ▪ Monitors URLs │
+│ ▪ Ingresses     │    │                  │    │ ▪ Sends alerts  │
+│ ▪ Services      │    │  Generates YAML  │    │ ▪ Health checks │
+├─────────────────┤    │  from K8s or     │    └─────────────────┘
+│   Docker        │◄───┤  Docker events   │
+│   Daemon        │    │                  │
+│                 │    │                  │
+│ ▪ Containers    │    │                  │
+│ ▪ Traefik labels│    │                  │
+└─────────────────┘    └──────────────────┘
 ```
 
 The sidecar operates by:
 
-1. **👀 Watching** Multiple Kubernetes resource types via the API server
-2. **🔗 Inheriting** Annotations from parent resources (Gateway → HTTPRoute, IngressClass → Ingress)
-3. **⚡ Processing** Resource events (create, update, delete) in real-time
-4. **🎛️ Filtering** Resources based on configuration flags and annotations
+1. **👀 Watching** Kubernetes resources via the API server, or Docker containers via the Docker daemon
+2. **🔗 Inheriting** Annotations from parent resources (Gateway → HTTPRoute, IngressClass → Ingress) in Kubernetes mode
+3. **⚡ Processing** Resource/container events (create, update, delete, start, stop) in real-time
+4. **🎛️ Filtering** Resources based on configuration flags, annotations, or Docker labels
 5. **📝 Generating** Gatus configuration files in YAML format
 6. **💾 Writing** Files to a shared volume that Gatus reads from
 7. **🔄 Updating** Configurations dynamically without Gatus restarts

@@ -6,22 +6,28 @@ import (
 )
 
 type Config struct {
-	Mode               string
-	Namespace          string
-	GatewayName        string
-	IngressClass       string
-	EnableHTTPRoute    bool
-	EnableIngress      bool
-	EnableService      bool
-	EnableIngressRoute bool
-	AutoHTTPRoute      bool
-	AutoIngress        bool
-	AutoService        bool
-	AutoIngressRoute   bool
-	Output             string
-	DefaultInterval    time.Duration
-	TemplateAnnotation string
-	EnabledAnnotation  string
+	Mode                  string
+	Namespace             string
+	GatewayName           string
+	IngressClass          string
+	EnableHTTPRoute       bool
+	EnableIngress         bool
+	EnableService         bool
+	EnableIngressRoute    bool
+	AutoHTTPRoute         bool
+	AutoIngress           bool
+	AutoService           bool
+	AutoIngressRoute      bool
+	Output                string
+	DefaultInterval       time.Duration
+	TemplateAnnotation    string
+	EnabledAnnotation     string
+	DockerHost            string
+	DockerDefaultProtocol string
+	DockerDefaultGroup    string
+	LabelConfig           string
+	LabelEnabled          string
+	LabelGroup            string
 }
 
 func Load() *Config {
@@ -42,6 +48,14 @@ func Load() *Config {
 	flag.DurationVar(&cfg.DefaultInterval, "default-interval", time.Minute, "Default interval value for endpoints")
 	flag.StringVar(&cfg.TemplateAnnotation, "annotation-config", "gatus.home-operations.com/endpoint", "Annotation key for YAML config override")
 	flag.StringVar(&cfg.EnabledAnnotation, "annotation-enabled", "gatus.home-operations.com/enabled", "Annotation key for enabling/disabling resource processing")
+
+	flag.StringVar(&cfg.Mode, "mode", "kubernetes", "Operating mode: kubernetes or docker")
+	flag.StringVar(&cfg.DockerHost, "docker-host", "", "Docker host (uses DOCKER_HOST env / default socket if empty)")
+	flag.StringVar(&cfg.DockerDefaultProtocol, "docker-default-protocol", "https", "Default protocol for Docker container URLs")
+	flag.StringVar(&cfg.DockerDefaultGroup, "docker-default-group", "", "Default group name for Docker container endpoints (empty to disable auto-grouping)")
+	flag.StringVar(&cfg.LabelConfig, "label-config", "gatus.endpoint", "Docker label key for YAML template override")
+	flag.StringVar(&cfg.LabelEnabled, "label-enabled", "gatus.enabled", "Docker label key for enabling/disabling container processing")
+	flag.StringVar(&cfg.LabelGroup, "label-group", "gatus.group", "Docker label key for per-container group name")
 
 	flag.CommandLine.Init("", flag.ExitOnError)
 	flag.Parse()
