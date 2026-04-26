@@ -7,9 +7,8 @@ import (
 	"sort"
 	"sync"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/home-operations/gatus-sidecar/internal/endpoint"
+	"github.com/home-operations/gatus-sidecar/internal/provider"
 )
 
 // Manager maintains the global state of all endpoints
@@ -17,13 +16,15 @@ type Manager struct {
 	mu         sync.Mutex
 	endpoints  map[string]*endpoint.Endpoint // keyed by resource key (name-namespace)
 	outputFile string
+	provider   provider.Provider
 }
 
-// NewManager creates a new state manager
-func NewManager(outputFile string) *Manager {
+// NewManager creates a new state manager with the given output provider.
+func NewManager(outputFile string, p provider.Provider) *Manager {
 	return &Manager{
 		endpoints:  make(map[string]*endpoint.Endpoint),
 		outputFile: outputFile,
+		provider:   p,
 	}
 }
 
@@ -72,38 +73,31 @@ func (m *Manager) ForceWrite() {
 
 // writeState writes the current state to disk (must be called with mutex held)
 func (m *Manager) writeState() {
-	state := m.getCurrentState()
+	endpoints := m.getSortedEndpoints()
 
-	yamlData, err := yaml.Marshal(state)
+	data, err := m.provider.Render(endpoints)
 	if err != nil {
-		slog.Error("failed to marshal state to yaml", "error", err)
+		slog.Error("failed to render state", "error", err, "provider", m.provider.Name())
 		return
 	}
 
-	if err := os.WriteFile(m.outputFile, yamlData, 0o644); err != nil {
+	if err := os.WriteFile(m.outputFile, data, 0o644); err != nil {
 		slog.Error("failed to write state to file", "error", err)
 		return
 	}
 
-	endpointCount := len(m.endpoints)
-	slog.Info("wrote consolidated state file", "file", m.outputFile, "endpoints", endpointCount)
+	slog.Info("wrote consolidated state file", "file", m.outputFile, "endpoints", len(m.endpoints), "provider", m.provider.Name())
 }
 
-// getCurrentState returns the current state as a map suitable for YAML generation
-// (must be called with mutex held)
-func (m *Manager) getCurrentState() map[string]any {
-	// Convert to slice and sort for consistent output
+// getSortedEndpoints returns endpoints sorted by name for deterministic output
+// (must be called with mutex held).
+func (m *Manager) getSortedEndpoints() []*endpoint.Endpoint {
 	endpoints := make([]*endpoint.Endpoint, 0, len(m.endpoints))
 	for _, e := range m.endpoints {
 		endpoints = append(endpoints, e)
 	}
-
-	// Sort by name for consistent ordering
 	sort.Slice(endpoints, func(i, j int) bool {
 		return endpoints[i].Name < endpoints[j].Name
 	})
-
-	return map[string]any{
-		"endpoints": endpoints,
-	}
+	return endpoints
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/client"
 
 	"github.com/home-operations/gatus-sidecar/internal/config"
+	gatusprovider "github.com/home-operations/gatus-sidecar/internal/provider/gatus"
 	"github.com/home-operations/gatus-sidecar/internal/state"
 )
 
@@ -69,7 +70,7 @@ func TestIntegration_InitialSync_TraefikLabels(t *testing.T) {
 	containerID := startTestContainer(t, dc, labels)
 
 	outputFile := filepath.Join(t.TempDir(), "gatus.yaml")
-	sm := state.NewManager(outputFile)
+	sm := state.NewManager(outputFile, gatusprovider.New())
 	ctrl := New(sm, dc)
 
 	cfg := &config.Config{
@@ -114,7 +115,7 @@ func TestIntegration_InitialSync_GatusURL(t *testing.T) {
 	startTestContainer(t, dc, labels)
 
 	outputFile := filepath.Join(t.TempDir(), "gatus.yaml")
-	sm := state.NewManager(outputFile)
+	sm := state.NewManager(outputFile, gatusprovider.New())
 	ctrl := New(sm, dc)
 
 	cfg := &config.Config{
@@ -151,7 +152,7 @@ func TestIntegration_InitialSync_DisabledContainer(t *testing.T) {
 	startTestContainer(t, dc, labels)
 
 	outputFile := filepath.Join(t.TempDir(), "gatus.yaml")
-	sm := state.NewManager(outputFile)
+	sm := state.NewManager(outputFile, gatusprovider.New())
 	ctrl := New(sm, dc)
 
 	cfg := &config.Config{
@@ -179,7 +180,7 @@ func TestIntegration_WatchLoop_StartStop(t *testing.T) {
 	defer dc.Close()
 
 	outputFile := filepath.Join(t.TempDir(), "gatus.yaml")
-	sm := state.NewManager(outputFile)
+	sm := state.NewManager(outputFile, gatusprovider.New())
 	ctrl := New(sm, dc)
 
 	cfg := &config.Config{

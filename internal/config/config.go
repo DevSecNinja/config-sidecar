@@ -28,6 +28,12 @@ type Config struct {
 	LabelConfig           string
 	LabelEnabled          string
 	LabelGroup            string
+
+	// Provider settings
+	ProviderType      string
+	UnboundDefaultIP  string
+	UnboundRecordType string
+	UnboundTTL        int
 }
 
 func Load() *Config {
@@ -56,6 +62,11 @@ func Load() *Config {
 	flag.StringVar(&cfg.LabelConfig, "label-config", "gatus.endpoint", "Docker label key for YAML template override")
 	flag.StringVar(&cfg.LabelEnabled, "label-enabled", "gatus.enabled", "Docker label key for enabling/disabling container processing")
 	flag.StringVar(&cfg.LabelGroup, "label-group", "gatus.group", "Docker label key for per-container group name")
+
+	flag.StringVar(&cfg.ProviderType, "provider", "gatus", "Output provider type: gatus or unbound")
+	flag.StringVar(&cfg.UnboundDefaultIP, "unbound-default-ip", "", "Default IP address for Unbound local-data DNS records")
+	flag.StringVar(&cfg.UnboundRecordType, "unbound-record-type", "A", "DNS record type for Unbound local-data records (e.g. A, AAAA)")
+	flag.IntVar(&cfg.UnboundTTL, "unbound-ttl", 0, "TTL (seconds) for Unbound DNS records; 0 omits the TTL field")
 
 	flag.CommandLine.Init("", flag.ExitOnError)
 	flag.Parse()

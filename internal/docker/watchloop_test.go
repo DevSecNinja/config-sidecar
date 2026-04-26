@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/events"
 
 	"github.com/home-operations/gatus-sidecar/internal/config"
+	gatusprovider "github.com/home-operations/gatus-sidecar/internal/provider/gatus"
 	"github.com/home-operations/gatus-sidecar/internal/state"
 )
 
@@ -52,7 +53,7 @@ func (f *fakeDockerClient) Events(ctx context.Context, options events.ListOption
 }
 
 func newTestController(fc *fakeDockerClient) *Controller {
-	sm := state.NewManager(filepath.Join("/tmp", "gatus-test-watchloop.yaml"))
+	sm := state.NewManager(filepath.Join("/tmp", "gatus-test-watchloop.yaml"), gatusprovider.New())
 	return &Controller{
 		client:       fc,
 		stateManager: sm,
