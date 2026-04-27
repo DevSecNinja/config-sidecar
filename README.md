@@ -1,27 +1,33 @@
 # 🚀 gatus-sidecar
 
-A powerful sidecar that automatically generates [Gatus](https://github.com/TwiN/gatus) monitoring configuration from Kubernetes resources (Ingress, Gateway API HTTPRoute, Service) or Docker containers (via Traefik labels). ⚡
+A powerful sidecar that automatically generates configuration files from Kubernetes resources (Ingress, Gateway API HTTPRoute, Service) or Docker containers (via Traefik labels). ⚡
 
 ## 🔍 Overview
 
-gatus-sidecar is a lightweight Go application designed to run alongside Gatus. It supports two operating modes:
+gatus-sidecar is a lightweight Go application that supports two operating modes and multiple output providers:
 
-- **Kubernetes mode** (default): Watches Kubernetes resources and automatically generates Gatus endpoint configurations
-- **Docker mode**: Watches Docker containers and generates endpoints from Traefik labels or explicit `gatus.url` labels
+- **Kubernetes mode** (default): Watches Kubernetes resources and automatically generates configuration
+- **Docker mode**: Watches Docker containers and generates configuration from Traefik labels or explicit `gatus.url` labels
 
-This eliminates the need to manually maintain monitoring configurations for your web services and infrastructure. 🎯
+Output is controlled by the **provider** flag:
+
+- **`gatus`** (default): Generates [Gatus](https://github.com/TwiN/gatus) monitoring endpoint YAML
+- **`unbound`**: Generates [Unbound](https://nlnetlabs.nl/projects/unbound/) local DNS records from discovered hostnames
+
+This eliminates the need to manually maintain monitoring or DNS configurations for your web services and infrastructure. 🎯
 
 ## ✨ Features
 
+- **🔌 Provider Architecture**: Pluggable output providers — use the same discovery engine with different backends
 - **🔄 Multi-Resource Support**: Supports Kubernetes Ingress, Gateway API HTTPRoute, Service resources, and Docker containers
-- **🐳 Docker Mode**: Watches Docker containers and generates endpoints from Traefik labels
-- **🔍 Automatic Discovery**: Watches for resource changes and dynamically updates monitoring configurations  
+- **🐳 Docker Mode**: Watches Docker containers and generates configuration from Traefik labels
+- **🔍 Automatic Discovery**: Watches for resource changes and dynamically updates configuration
 - **🎛️ Flexible Filtering**: Filter resources by namespace, gateway name, or ingress class
 - **📋 Template Support**: Override default configurations using Kubernetes annotations or Docker labels
 - **🏗️ Gateway Inheritance**: HTTPRoutes automatically inherit annotations from their parent gateway
 - **🏗️ Ingress Inheritance**: Ingress automatically inherit annotations from their parent ingress class
 - **👥 Auto-Grouping**: Automatically group endpoints by namespace (Services) or gateway/ingress class (HTTPRoutes/Ingresses)
-- **⚡ Zero Downtime**: Hot-reload configurations without restarting Gatus
+- **⚡ Zero Downtime**: Hot-reload configurations without restarting the consumer application
 - **🪶 Lightweight**: Minimal resource footprint with efficient API watching
 - **🎯 Selective Processing**: Enable/disable monitoring per resource with annotations or labels
 
@@ -60,7 +66,7 @@ gatus-sidecar [options]
 | `--auto-httproute` | `false` | Automatically create endpoints for HTTPRoutes |
 | `--auto-ingress` | `false` | Automatically create endpoints for Ingresses |
 | `--auto-service` | `false` | Automatically create endpoints for Services |
-| `--output` | `/config/gatus-sidecar.yaml` | File to write generated YAML |
+| `--output` | `/config/gatus-sidecar.yaml` | File to write generated output |
 | `--default-interval` | `1m` | Default interval value for endpoints |
 | `--annotation-config` | `gatus.home-operations.com/endpoint` | Annotation key for YAML config override |
 | `--annotation-enabled` | `gatus.home-operations.com/enabled` | Annotation key for enabling/disabling resource processing |
@@ -71,6 +77,10 @@ gatus-sidecar [options]
 | `--label-config` | `gatus.endpoint` | Docker label key for YAML template override |
 | `--label-enabled` | `gatus.enabled` | Docker label key for enabling/disabling container processing |
 | `--label-group` | `gatus.group` | Docker label key for per-container group name |
+| `--provider` | `gatus` | Output provider: `gatus` or `unbound` |
+| `--unbound-default-ip` | `""` | IP address written into every Unbound `local-data` record |
+| `--unbound-record-type` | `A` | DNS record type for Unbound records (e.g. `A`, `AAAA`) |
+| `--unbound-ttl` | `0` | TTL (seconds) for Unbound DNS records; `0` omits the TTL field |
 
 ### 🌐 HTTPRoute Mode
 
@@ -113,6 +123,43 @@ gatus-sidecar --mode=docker --output=/config/gatus-sidecar.yaml
 ```
 
 Containers with Traefik router labels (`traefik.http.routers.*.rule`) are automatically discovered. Containers without Traefik labels are ignored unless they have an explicit `gatus.url` label. Use `gatus.enabled=false` to opt out a specific container.
+
+### 🔌 Unbound DNS Provider
+
+Generate [Unbound](https://nlnetlabs.nl/projects/unbound/) `local-data` DNS records for all discovered hostnames:
+
+```bash
+# Docker mode — create Unbound records for every Traefik-labelled container
+gatus-sidecar \
+  --mode=docker \
+  --provider=unbound \
+  --unbound-default-ip=192.168.1.10 \
+  --output=/etc/unbound/sidecar.conf
+
+# Kubernetes mode — create Unbound records for every HTTPRoute hostname
+gatus-sidecar \
+  --auto-httproute \
+  --provider=unbound \
+  --unbound-default-ip=10.0.0.1 \
+  --unbound-record-type=A \
+  --unbound-ttl=300 \
+  --output=/etc/unbound/sidecar.conf
+```
+
+The generated file looks like:
+
+```
+# Generated by sidecar at 2024-01-01T00:00:00Z
+local-data: "api.example.com. A 192.168.1.10"
+local-data: "app.example.com. A 192.168.1.10"
+```
+
+Include the file in your Unbound configuration:
+
+```
+server:
+    include: "/etc/unbound/sidecar.conf"
+```
 
 ## ⚙️ Configuration
 
@@ -576,21 +623,21 @@ go build -o gatus-sidecar cmd/root.go
 ## 🏗️ Architecture
 
 ```text
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Kubernetes    │    │  gatus-sidecar   │    │     Gatus       │
-│   API Server    │◄───┤                  ├───►│   Monitoring    │
-│                 │    │  Mode:           │    │                 │
-│ ▪ HTTPRoutes    │    │  ▪ kubernetes    │    │ ▪ Reads config  │
-│ ▪ Gateways      │    │  ▪ docker        │    │ ▪ Monitors URLs │
-│ ▪ Ingresses     │    │                  │    │ ▪ Sends alerts  │
-│ ▪ Services      │    │  Generates YAML  │    │ ▪ Health checks │
-├─────────────────┤    │  from K8s or     │    └─────────────────┘
-│   Docker        │◄───┤  Docker events   │
-│   Daemon        │    │                  │
-│                 │    │                  │
-│ ▪ Containers    │    │                  │
-│ ▪ Traefik labels│    │                  │
-└─────────────────┘    └──────────────────┘
+┌─────────────────┐    ┌──────────────────────────────────┐    ┌─────────────────┐
+│   Kubernetes    │    │           sidecar                │    │     Gatus       │
+│   API Server    │◄───┤                                  ├───►│   Monitoring    │
+│                 │    │  Mode:                           │    │                 │
+│ ▪ HTTPRoutes    │    │  ▪ kubernetes                    │    │ ▪ Reads config  │
+│ ▪ Gateways      │    │  ▪ docker                        │    │ ▪ Monitors URLs │
+│ ▪ Ingresses     │    │                                  │    │ ▪ Sends alerts  │
+│ ▪ Services      │    │  Provider:                       │    │ ▪ Health checks │
+├─────────────────┤    │  ▪ gatus  → Gatus YAML           │    └─────────────────┘
+│   Docker        │◄───┤  ▪ unbound→ Unbound local-data   │    ┌─────────────────┐
+│   Daemon        │    │                                  ├───►│     Unbound     │
+│                 │    │  Discovers services, extracts    │    │   DNS Server    │
+│ ▪ Containers    │    │  hostnames, writes output file   │    │                 │
+│ ▪ Traefik labels│    │                                  │    │ ▪ local-data    │
+└─────────────────┘    └──────────────────────────────────┘    └─────────────────┘
 ```
 
 The sidecar operates by:
@@ -599,21 +646,36 @@ The sidecar operates by:
 2. **🔗 Inheriting** Annotations from parent resources (Gateway → HTTPRoute, IngressClass → Ingress) in Kubernetes mode
 3. **⚡ Processing** Resource/container events (create, update, delete, start, stop) in real-time
 4. **🎛️ Filtering** Resources based on configuration flags, annotations, or Docker labels
-5. **📝 Generating** Gatus configuration files in YAML format
-6. **💾 Writing** Files to a shared volume that Gatus reads from
-7. **🔄 Updating** Configurations dynamically without Gatus restarts
+5. **📝 Rendering** Configuration via the active **provider** (`gatus` or `unbound`)
+6. **💾 Writing** Files to a shared volume consumed by the target application
+7. **🔄 Updating** Configurations dynamically without restarting the target application
+
+### 🔌 Provider Architecture
+
+The output format is decoupled from the discovery mechanism through the `Provider` interface:
+
+```
+internal/provider/
+  provider.go          # Provider interface: Name() + Render([]*Endpoint) ([]byte, error)
+  gatus/
+    gatus.go           # Generates Gatus-compatible YAML (endpoints: [...])
+  unbound/
+    unbound.go         # Generates Unbound local-data DNS records
+```
+
+Any number of providers can be added without touching the discovery or state management code. The active provider is selected via `--provider` at startup.
 
 ### 🎯 Resource Processing Logic
 
 ```text
-┌─────────────┐    ┌────────────────┐    ┌──────────────┐
-│  Resource   │───►│ Annotation     │───►│   Endpoint   │
-│  Discovery  │    │ Processing     │    │  Generation  │
-│             │    │                │    │              │
-│ ▪ Auto Mode │    │ ▪ Parent merge │    │ ▪ URL extract│
-│ ▪ Selective │    │ ▪ Template     │    │ ▪ Conditions │
-│ ▪ Filtered  │    │ ▪ Enabled      │    │ ▪ Grouping   │
-└─────────────┘    └────────────────┘    └──────────────┘
+┌─────────────┐    ┌────────────────┐    ┌──────────────┐    ┌────────────────┐
+│  Resource   │───►│ Annotation     │───►│   Endpoint   │───►│   Provider     │
+│  Discovery  │    │ Processing     │    │  Generation  │    │  Rendering     │
+│             │    │                │    │              │    │                │
+│ ▪ Auto Mode │    │ ▪ Parent merge │    │ ▪ URL extract│    │ ▪ gatus YAML   │
+│ ▪ Selective │    │ ▪ Template     │    │ ▪ Conditions │    │ ▪ Unbound conf │
+│ ▪ Filtered  │    │ ▪ Enabled      │    │ ▪ Grouping   │    │ ▪ ...          │
+└─────────────┘    └────────────────┘    └──────────────┘    └────────────────┘
 ```
 
 ## 🤝 Contributing
@@ -630,5 +692,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔗 Related Projects
 
-- [Gatus](https://github.com/TwiN/gatus) - The monitoring solution this sidecar supports 📊
+- [Gatus](https://github.com/TwiN/gatus) - The monitoring solution the `gatus` provider targets 📊
+- [Unbound](https://nlnetlabs.nl/projects/unbound/) - The DNS resolver the `unbound` provider targets 🌐
 - [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io/) - Next generation of Kubernetes ingress ⚡

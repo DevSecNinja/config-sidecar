@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/client"
 
 	"github.com/home-operations/gatus-sidecar/internal/config"
+	gatusprovider "github.com/home-operations/gatus-sidecar/internal/provider/gatus"
 	"github.com/home-operations/gatus-sidecar/internal/state"
 )
 
@@ -44,6 +45,9 @@ func startTestContainer(t *testing.T, dc *client.Client, labels map[string]strin
 		Labels: labels,
 	}, nil, nil, nil, "")
 	if err != nil {
+		if strings.Contains(err.Error(), "No such image") || strings.Contains(err.Error(), "not found") {
+			t.Skipf("image alpine:latest not available, skipping integration test: %v", err)
+		}
 		t.Fatalf("failed to create container: %v", err)
 	}
 
@@ -69,7 +73,7 @@ func TestIntegration_InitialSync_TraefikLabels(t *testing.T) {
 	containerID := startTestContainer(t, dc, labels)
 
 	outputFile := filepath.Join(t.TempDir(), "gatus.yaml")
-	sm := state.NewManager(outputFile)
+	sm := state.NewManager(outputFile, gatusprovider.New())
 	ctrl := New(sm, dc)
 
 	cfg := &config.Config{
@@ -114,7 +118,7 @@ func TestIntegration_InitialSync_GatusURL(t *testing.T) {
 	startTestContainer(t, dc, labels)
 
 	outputFile := filepath.Join(t.TempDir(), "gatus.yaml")
-	sm := state.NewManager(outputFile)
+	sm := state.NewManager(outputFile, gatusprovider.New())
 	ctrl := New(sm, dc)
 
 	cfg := &config.Config{
@@ -146,12 +150,12 @@ func TestIntegration_InitialSync_DisabledContainer(t *testing.T) {
 
 	labels := map[string]string{
 		"traefik.http.routers.disabled.rule": "Host(`disabled.example.com`)",
-		"gatus.enabled":                     "false",
+		"gatus.enabled":                      "false",
 	}
 	startTestContainer(t, dc, labels)
 
 	outputFile := filepath.Join(t.TempDir(), "gatus.yaml")
-	sm := state.NewManager(outputFile)
+	sm := state.NewManager(outputFile, gatusprovider.New())
 	ctrl := New(sm, dc)
 
 	cfg := &config.Config{
@@ -179,7 +183,7 @@ func TestIntegration_WatchLoop_StartStop(t *testing.T) {
 	defer dc.Close()
 
 	outputFile := filepath.Join(t.TempDir(), "gatus.yaml")
-	sm := state.NewManager(outputFile)
+	sm := state.NewManager(outputFile, gatusprovider.New())
 	ctrl := New(sm, dc)
 
 	cfg := &config.Config{

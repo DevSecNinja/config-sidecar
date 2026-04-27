@@ -6,12 +6,17 @@ import (
 	"testing"
 
 	"github.com/home-operations/gatus-sidecar/internal/endpoint"
+	gatusprovider "github.com/home-operations/gatus-sidecar/internal/provider/gatus"
 )
 
-func TestManager_AddOrUpdate(t *testing.T) {
+func newTestManager(t *testing.T) *Manager {
+	t.Helper()
 	tmpDir := t.TempDir()
-	outputFile := filepath.Join(tmpDir, "test.yaml")
-	m := NewManager(outputFile)
+	return NewManager(filepath.Join(tmpDir, "test.yaml"), gatusprovider.New())
+}
+
+func TestManager_AddOrUpdate(t *testing.T) {
+	m := newTestManager(t)
 
 	e1 := &endpoint.Endpoint{
 		Name:     "test-endpoint",
@@ -67,9 +72,7 @@ func TestManager_AddOrUpdate(t *testing.T) {
 }
 
 func TestManager_Remove(t *testing.T) {
-	tmpDir := t.TempDir()
-	outputFile := filepath.Join(tmpDir, "test.yaml")
-	m := NewManager(outputFile)
+	m := newTestManager(t)
 
 	e1 := &endpoint.Endpoint{
 		Name:     "test-endpoint",
@@ -109,7 +112,7 @@ func TestManager_Remove(t *testing.T) {
 func TestManager_ForceWrite(t *testing.T) {
 	tmpDir := t.TempDir()
 	outputFile := filepath.Join(tmpDir, "test.yaml")
-	m := NewManager(outputFile)
+	m := NewManager(outputFile, gatusprovider.New())
 
 	e1 := &endpoint.Endpoint{
 		Name:       "test-endpoint",
@@ -146,7 +149,7 @@ func TestManager_ForceWrite(t *testing.T) {
 func TestManager_WriteStateWithMultipleEndpoints(t *testing.T) {
 	tmpDir := t.TempDir()
 	outputFile := filepath.Join(tmpDir, "test.yaml")
-	m := NewManager(outputFile)
+	m := NewManager(outputFile, gatusprovider.New())
 
 	endpoints := []*endpoint.Endpoint{
 		{Name: "z-endpoint", URL: "https://z.example.com", Interval: "1m"},
@@ -178,7 +181,7 @@ func TestManager_WriteStateWithMultipleEndpoints(t *testing.T) {
 func TestManager_NoWriteOnNoChange(t *testing.T) {
 	tmpDir := t.TempDir()
 	outputFile := filepath.Join(tmpDir, "test.yaml")
-	m := NewManager(outputFile)
+	m := NewManager(outputFile, gatusprovider.New())
 
 	e1 := &endpoint.Endpoint{
 		Name:     "test-endpoint",
@@ -208,7 +211,7 @@ func TestManager_NoWriteOnNoChange(t *testing.T) {
 func TestManager_ConcurrentOperations(t *testing.T) {
 	tmpDir := t.TempDir()
 	outputFile := filepath.Join(tmpDir, "test.yaml")
-	m := NewManager(outputFile)
+	m := NewManager(outputFile, gatusprovider.New())
 
 	done := make(chan bool)
 

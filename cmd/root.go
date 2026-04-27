@@ -13,6 +13,9 @@ import (
 	"github.com/home-operations/gatus-sidecar/internal/config"
 	"github.com/home-operations/gatus-sidecar/internal/controller"
 	"github.com/home-operations/gatus-sidecar/internal/docker"
+	"github.com/home-operations/gatus-sidecar/internal/provider"
+	gatusprovider "github.com/home-operations/gatus-sidecar/internal/provider/gatus"
+	unboundprovider "github.com/home-operations/gatus-sidecar/internal/provider/unbound"
 	"github.com/home-operations/gatus-sidecar/internal/resources/httproute"
 	"github.com/home-operations/gatus-sidecar/internal/resources/ingress"
 	"github.com/home-operations/gatus-sidecar/internal/resources/ingressroute"
@@ -28,14 +31,16 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
+	p := buildProvider(cfg)
+
 	switch cfg.Mode {
 	case "docker":
-		if err := runDocker(ctx, cfg); err != nil {
+		if err := runDocker(ctx, cfg, p); err != nil {
 			slog.Error("Docker mode failed", "error", err)
 			os.Exit(1)
 		}
 	default:
-		if err := runKubernetes(ctx, cfg); err != nil {
+		if err := runKubernetes(ctx, cfg, p); err != nil {
 			slog.Error("Kubernetes mode failed", "error", err)
 			os.Exit(1)
 		}
@@ -44,7 +49,23 @@ func main() {
 	slog.Info("All controllers have finished successfully")
 }
 
-func runDocker(ctx context.Context, cfg *config.Config) error {
+// buildProvider creates the configured output provider.
+func buildProvider(cfg *config.Config) provider.Provider {
+	switch cfg.ProviderType {
+	case "unbound":
+		slog.Info("using unbound output provider",
+			"default-ip", cfg.UnboundDefaultIP,
+			"record-type", cfg.UnboundRecordType,
+			"ttl", cfg.UnboundTTL,
+		)
+		return unboundprovider.New(cfg.UnboundDefaultIP, cfg.UnboundRecordType, cfg.UnboundTTL)
+	default:
+		slog.Info("using gatus output provider")
+		return gatusprovider.New()
+	}
+}
+
+func runDocker(ctx context.Context, cfg *config.Config, p provider.Provider) error {
 	opts := []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation()}
 	if cfg.DockerHost != "" {
 		opts = append(opts, client.WithHost(cfg.DockerHost))
@@ -54,16 +75,20 @@ func runDocker(ctx context.Context, cfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("create docker client: %w", err)
 	}
-	defer dockerClient.Close()
+	defer func() {
+		if err := dockerClient.Close(); err != nil {
+			slog.Warn("failed to close docker client", "error", err)
+		}
+	}()
 
-	stateManager := state.NewManager(cfg.Output)
+	stateManager := state.NewManager(cfg.Output, p)
 	ctrl := docker.New(stateManager, dockerClient)
 
 	slog.Info("starting in docker mode")
 	return ctrl.Run(ctx, cfg)
 }
 
-func runKubernetes(ctx context.Context, cfg *config.Config) error {
+func runKubernetes(ctx context.Context, cfg *config.Config, p provider.Provider) error {
 	restCfg, err := getKubeConfig()
 	if err != nil {
 		return fmt.Errorf("get kubernetes config: %w", err)
@@ -74,7 +99,7 @@ func runKubernetes(ctx context.Context, cfg *config.Config) error {
 		return fmt.Errorf("create dynamic client: %w", err)
 	}
 
-	stateManager := state.NewManager(cfg.Output)
+	stateManager := state.NewManager(cfg.Output, p)
 
 	// Initialize controllers slice
 	controllers := []*controller.Controller{}

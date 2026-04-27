@@ -438,6 +438,14 @@ func TestApplyGatusLabels(t *testing.T) {
 			t.Errorf("Client[ignore-redirect] = %v, want true", e.Client["ignore-redirect"])
 		}
 	})
+}
+
+func TestApplyGatusLabels_Headers(t *testing.T) {
+	cfg := &config.Config{
+		LabelConfig:  "gatus.endpoint",
+		LabelEnabled: "gatus.enabled",
+		LabelGroup:   "gatus.group",
+	}
 
 	t.Run("gatus.headers dot-separated keys assemble headers map", func(t *testing.T) {
 		e := &endpoint.Endpoint{Name: "app", URL: "https://example.com"}
