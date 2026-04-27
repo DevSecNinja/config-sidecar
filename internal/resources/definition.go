@@ -11,8 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
-	"github.com/home-operations/gatus-sidecar/internal/config"
-	"github.com/home-operations/gatus-sidecar/internal/endpoint"
+	"github.com/home-operations/config-sidecar/internal/config"
+	"github.com/home-operations/config-sidecar/internal/endpoint"
 )
 
 // ResourceDefinition defines how to handle a specific Kubernetes resource type

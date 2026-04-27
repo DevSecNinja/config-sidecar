@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/home-operations/gatus-sidecar/internal/endpoint"
-	unboundprovider "github.com/home-operations/gatus-sidecar/internal/provider/unbound"
+	"github.com/home-operations/config-sidecar/internal/endpoint"
+	unboundprovider "github.com/home-operations/config-sidecar/internal/provider/unbound"
 )
 
 func TestUnboundProvider_Name(t *testing.T) {

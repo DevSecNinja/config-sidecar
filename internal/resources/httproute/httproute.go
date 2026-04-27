@@ -10,9 +10,9 @@ import (
 	"k8s.io/client-go/dynamic"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/home-operations/gatus-sidecar/internal/config"
-	"github.com/home-operations/gatus-sidecar/internal/endpoint"
-	"github.com/home-operations/gatus-sidecar/internal/resources"
+	"github.com/home-operations/config-sidecar/internal/config"
+	"github.com/home-operations/config-sidecar/internal/endpoint"
+	"github.com/home-operations/config-sidecar/internal/resources"
 )
 
 const (

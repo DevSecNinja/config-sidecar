@@ -7,8 +7,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/home-operations/gatus-sidecar/internal/endpoint"
-	"github.com/home-operations/gatus-sidecar/internal/provider"
+	"github.com/home-operations/config-sidecar/internal/endpoint"
+	"github.com/home-operations/config-sidecar/internal/provider"
 )
 
 // Manager maintains the global state of all endpoints

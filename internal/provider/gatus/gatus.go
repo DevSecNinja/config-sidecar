@@ -1,8 +1,8 @@
 package gatus
 
 import (
-	"github.com/home-operations/gatus-sidecar/internal/endpoint"
-	"github.com/home-operations/gatus-sidecar/internal/provider"
+	"github.com/home-operations/config-sidecar/internal/endpoint"
+	"github.com/home-operations/config-sidecar/internal/provider"
 	"gopkg.in/yaml.v3"
 )
 

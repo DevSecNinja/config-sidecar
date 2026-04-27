@@ -1,10 +1,10 @@
-# 🚀 gatus-sidecar
+# 🚀 config-sidecar
 
 A powerful sidecar that automatically generates configuration files from Kubernetes resources (Ingress, Gateway API HTTPRoute, Service) or Docker containers (via Traefik labels). ⚡
 
 ## 🔍 Overview
 
-gatus-sidecar is a lightweight Go application that supports two operating modes and multiple output providers:
+config-sidecar is a lightweight Go application that supports two operating modes and multiple output providers:
 
 - **Kubernetes mode** (default): Watches Kubernetes resources and automatically generates configuration
 - **Docker mode**: Watches Docker containers and generates configuration from Traefik labels or explicit `gatus.url` labels
@@ -36,15 +36,15 @@ This eliminates the need to manually maintain monitoring or DNS configurations f
 ### 🐳 Using Docker
 
 ```bash
-docker pull ghcr.io/home-operations/gatus-sidecar:latest
+docker pull ghcr.io/home-operations/config-sidecar:latest
 ```
 
 ### 🔨 Building from Source
 
 ```bash
-git clone https://github.com/home-operations/gatus-sidecar.git
-cd gatus-sidecar
-go build -o gatus-sidecar cmd/root.go
+git clone https://github.com/home-operations/config-sidecar.git
+cd config-sidecar
+go build -o config-sidecar cmd/root.go
 ```
 
 ## 🛠️ Usage
@@ -52,7 +52,7 @@ go build -o gatus-sidecar cmd/root.go
 ### ⚙️ Command Line Options
 
 ```bash
-gatus-sidecar [options]
+config-sidecar [options]
 ```
 
 | Flag | Default | Description |
@@ -66,7 +66,7 @@ gatus-sidecar [options]
 | `--auto-httproute` | `false` | Automatically create endpoints for HTTPRoutes |
 | `--auto-ingress` | `false` | Automatically create endpoints for Ingresses |
 | `--auto-service` | `false` | Automatically create endpoints for Services |
-| `--output` | `/config/gatus-sidecar.yaml` | File to write generated output |
+| `--output` | `/config/config-sidecar.yaml` | File to write generated output |
 | `--default-interval` | `1m` | Default interval value for endpoints |
 | `--annotation-config` | `gatus.home-operations.com/endpoint` | Annotation key for YAML config override |
 | `--annotation-enabled` | `gatus.home-operations.com/enabled` | Annotation key for enabling/disabling resource processing |
@@ -87,7 +87,7 @@ gatus-sidecar [options]
 Monitor Gateway API HTTPRoute resources:
 
 ```bash
-gatus-sidecar --auto-httproute --gateway-name=my-gateway
+config-sidecar --auto-httproute --gateway-name=my-gateway
 ```
 
 ### 🔀 Ingress Mode
@@ -95,7 +95,7 @@ gatus-sidecar --auto-httproute --gateway-name=my-gateway
 Monitor Kubernetes Ingress resources:
 
 ```bash
-gatus-sidecar --auto-ingress --ingress-class=nginx
+config-sidecar --auto-ingress --ingress-class=nginx
 ```
 
 ### 🔧 Service Mode
@@ -103,7 +103,7 @@ gatus-sidecar --auto-ingress --ingress-class=nginx
 Monitor Kubernetes Service resources:
 
 ```bash
-gatus-sidecar --auto-service --namespace=production
+config-sidecar --auto-service --namespace=production
 ```
 
 ### 📊 Multi-Resource Mode
@@ -111,7 +111,7 @@ gatus-sidecar --auto-service --namespace=production
 Monitor all resource types simultaneously:
 
 ```bash
-gatus-sidecar --auto-httproute --auto-ingress --auto-service
+config-sidecar --auto-httproute --auto-ingress --auto-service
 ```
 
 ### 🐳 Docker Mode
@@ -119,7 +119,7 @@ gatus-sidecar --auto-httproute --auto-ingress --auto-service
 Monitor Docker containers with Traefik labels:
 
 ```bash
-gatus-sidecar --mode=docker --output=/config/gatus-sidecar.yaml
+config-sidecar --mode=docker --output=/config/config-sidecar.yaml
 ```
 
 Containers with Traefik router labels (`traefik.http.routers.*.rule`) are automatically discovered. Containers without Traefik labels are ignored unless they have an explicit `gatus.url` label. Use `gatus.enabled=false` to opt out a specific container.
@@ -130,14 +130,14 @@ Generate [Unbound](https://nlnetlabs.nl/projects/unbound/) `local-data` DNS reco
 
 ```bash
 # Docker mode — create Unbound records for every Traefik-labelled container
-gatus-sidecar \
+config-sidecar \
   --mode=docker \
   --provider=unbound \
   --unbound-default-ip=192.168.1.10 \
   --output=/etc/unbound/sidecar.conf
 
 # Kubernetes mode — create Unbound records for every HTTPRoute hostname
-gatus-sidecar \
+config-sidecar \
   --auto-httproute \
   --provider=unbound \
   --unbound-default-ip=10.0.0.1 \
@@ -426,12 +426,12 @@ services:
     volumes:
       - gatus-config:/config
 
-  gatus-sidecar:
-    image: ghcr.io/home-operations/gatus-sidecar:latest
+  config-sidecar:
+    image: ghcr.io/home-operations/config-sidecar:latest
     command:
       - --mode=docker
       - --docker-default-group=Docker
-      - --output=/config/gatus-sidecar.yaml
+      - --output=/config/config-sidecar.yaml
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - gatus-config:/config
@@ -464,7 +464,7 @@ spec:
       labels:
         app: gatus
     spec:
-      serviceAccountName: gatus-sidecar  # Required for Kubernetes API access
+      serviceAccountName: config-sidecar  # Required for Kubernetes API access
       containers:
       - name: gatus
         image: ghcr.io/twin/gatus:latest
@@ -473,15 +473,15 @@ spec:
         volumeMounts:
         - name: gatus-config
           mountPath: /config
-      - name: gatus-sidecar
-        image: ghcr.io/home-operations/gatus-sidecar:latest
+      - name: config-sidecar
+        image: ghcr.io/home-operations/config-sidecar:latest
         args:
         - --auto-httproute
         - --auto-ingress
         - --auto-service
         - --auto-group
         - --gateway-name=production-gateway
-        - --output=/config/gatus-sidecar.yaml
+        - --output=/config/config-sidecar.yaml
         volumeMounts:
         - name: gatus-config
           mountPath: /config
@@ -492,12 +492,12 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: gatus-sidecar
+  name: config-sidecar
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: gatus-sidecar
+  name: config-sidecar
 rules:
 - apiGroups: [""]
   resources: ["services"]
@@ -512,14 +512,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: gatus-sidecar
+  name: config-sidecar
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: gatus-sidecar
+  name: config-sidecar
 subjects:
 - kind: ServiceAccount
-  name: gatus-sidecar
+  name: config-sidecar
   namespace: default  # Update to your deployment namespace
 ```
 
@@ -551,13 +551,13 @@ spec:
         volumeMounts:
         - name: gatus-config
           mountPath: /config
-      - name: gatus-sidecar
-        image: ghcr.io/home-operations/gatus-sidecar:latest
+      - name: config-sidecar
+        image: ghcr.io/home-operations/config-sidecar:latest
         args:
         - --namespace=production
         - --auto-httproute
         - --auto-service
-        - --output=/config/gatus-sidecar.yaml
+        - --output=/config/config-sidecar.yaml
         volumeMounts:
         - name: gatus-config
           mountPath: /config
@@ -580,7 +580,7 @@ spec:
 
 ```bash
 go mod download
-go build -o gatus-sidecar cmd/root.go
+go build -o config-sidecar cmd/root.go
 ```
 
 ### 🧪 Testing
@@ -611,13 +611,13 @@ To run the sidecar locally against a Kubernetes cluster:
 
 ```bash
 # Build the binary
-go build -o gatus-sidecar cmd/root.go
+go build -o config-sidecar cmd/root.go
 
 # Run with auto-discovery enabled (requires KUBECONFIG)
-./gatus-sidecar --auto-httproute --auto-service --output=./gatus-config.yaml
+./config-sidecar --auto-httproute --auto-service --output=./gatus-config.yaml
 
 # Or run with selective monitoring
-./gatus-sidecar --namespace=default --gateway-name=my-gateway
+./config-sidecar --namespace=default --gateway-name=my-gateway
 ```
 
 ## 🏗️ Architecture

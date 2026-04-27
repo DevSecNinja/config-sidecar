@@ -11,9 +11,9 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
 
-	"github.com/home-operations/gatus-sidecar/internal/config"
-	gatusprovider "github.com/home-operations/gatus-sidecar/internal/provider/gatus"
-	"github.com/home-operations/gatus-sidecar/internal/state"
+	"github.com/home-operations/config-sidecar/internal/config"
+	gatusprovider "github.com/home-operations/config-sidecar/internal/provider/gatus"
+	"github.com/home-operations/config-sidecar/internal/state"
 )
 
 // fakeDockerClient implements dockerClient for unit tests.

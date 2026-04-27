@@ -1,4 +1,4 @@
-module github.com/home-operations/gatus-sidecar
+module github.com/home-operations/config-sidecar
 
 go 1.25.0
 
