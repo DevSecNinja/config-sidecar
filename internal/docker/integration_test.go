@@ -45,6 +45,9 @@ func startTestContainer(t *testing.T, dc *client.Client, labels map[string]strin
 		Labels: labels,
 	}, nil, nil, nil, "")
 	if err != nil {
+		if strings.Contains(err.Error(), "No such image") || strings.Contains(err.Error(), "not found") {
+			t.Skipf("image alpine:latest not available, skipping integration test: %v", err)
+		}
 		t.Fatalf("failed to create container: %v", err)
 	}
 
@@ -147,7 +150,7 @@ func TestIntegration_InitialSync_DisabledContainer(t *testing.T) {
 
 	labels := map[string]string{
 		"traefik.http.routers.disabled.rule": "Host(`disabled.example.com`)",
-		"gatus.enabled":                     "false",
+		"gatus.enabled":                      "false",
 	}
 	startTestContainer(t, dc, labels)
 

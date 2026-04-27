@@ -105,10 +105,7 @@ func TestWatchLoop_ReconnectsOnTransientError(t *testing.T) {
 	// Wait long enough for 2 reconnects (5s backoff each) plus some margin.
 	// Use a polling approach so the test doesn't sleep unnecessarily long.
 	deadline := time.After(15 * time.Second)
-	for {
-		if callCount.Load() >= 3 {
-			break
-		}
+	for callCount.Load() < 3 {
 		select {
 		case <-deadline:
 			t.Fatalf("timed out waiting for reconnects; Events called %d times", callCount.Load())
@@ -161,10 +158,7 @@ func TestWatchLoop_ReSyncsAfterError(t *testing.T) {
 
 	// Wait for at least 1 re-sync (initialSync is called inside watchLoop on error).
 	deadline := time.After(10 * time.Second)
-	for {
-		if syncCount.Load() >= 1 {
-			break
-		}
+	for syncCount.Load() < 1 {
 		select {
 		case <-deadline:
 			t.Fatalf("timed out waiting for re-sync; ContainerList called %d times", syncCount.Load())

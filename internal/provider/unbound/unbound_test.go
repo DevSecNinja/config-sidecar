@@ -132,7 +132,7 @@ func TestUnboundProvider_Render_SortedAlphabetically(t *testing.T) {
 		t.Fatalf("expected all hostnames in output, got:\n%s", content)
 	}
 
-	if !(aPos < mPos && mPos < zPos) {
+	if aPos >= mPos || mPos >= zPos {
 		t.Errorf("records should be sorted alphabetically: a=%d m=%d z=%d\noutput:\n%s", aPos, mPos, zPos, content)
 	}
 }

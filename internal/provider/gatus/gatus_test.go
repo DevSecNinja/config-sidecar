@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	gatusprovider "github.com/home-operations/gatus-sidecar/internal/provider/gatus"
 	"github.com/home-operations/gatus-sidecar/internal/endpoint"
+	gatusprovider "github.com/home-operations/gatus-sidecar/internal/provider/gatus"
 )
 
 func TestGatusProvider_Name(t *testing.T) {

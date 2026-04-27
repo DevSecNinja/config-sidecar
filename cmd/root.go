@@ -53,7 +53,11 @@ func main() {
 func buildProvider(cfg *config.Config) provider.Provider {
 	switch cfg.ProviderType {
 	case "unbound":
-		slog.Info("using unbound output provider", "default-ip", cfg.UnboundDefaultIP, "record-type", cfg.UnboundRecordType, "ttl", cfg.UnboundTTL)
+		slog.Info("using unbound output provider",
+			"default-ip", cfg.UnboundDefaultIP,
+			"record-type", cfg.UnboundRecordType,
+			"ttl", cfg.UnboundTTL,
+		)
 		return unboundprovider.New(cfg.UnboundDefaultIP, cfg.UnboundRecordType, cfg.UnboundTTL)
 	default:
 		slog.Info("using gatus output provider")
@@ -71,7 +75,11 @@ func runDocker(ctx context.Context, cfg *config.Config, p provider.Provider) err
 	if err != nil {
 		return fmt.Errorf("create docker client: %w", err)
 	}
-	defer dockerClient.Close()
+	defer func() {
+		if err := dockerClient.Close(); err != nil {
+			slog.Warn("failed to close docker client", "error", err)
+		}
+	}()
 
 	stateManager := state.NewManager(cfg.Output, p)
 	ctrl := docker.New(stateManager, dockerClient)
