@@ -1,6 +1,6 @@
 package provider
 
-import "github.com/home-operations/gatus-sidecar/internal/endpoint"
+import "github.com/home-operations/config-sidecar/internal/endpoint"
 
 // Provider renders a list of endpoints to an output-specific byte slice.
 type Provider interface {

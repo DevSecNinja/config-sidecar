@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/home-operations/gatus-sidecar/internal/config"
+	"github.com/home-operations/config-sidecar/internal/config"
 )
 
 func TestStateKey(t *testing.T) {

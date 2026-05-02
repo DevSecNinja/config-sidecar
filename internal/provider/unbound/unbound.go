@@ -7,8 +7,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/home-operations/gatus-sidecar/internal/endpoint"
-	"github.com/home-operations/gatus-sidecar/internal/provider"
+	"github.com/home-operations/config-sidecar/internal/endpoint"
+	"github.com/home-operations/config-sidecar/internal/provider"
 )
 
 // Provider generates Unbound local DNS configuration from discovered endpoints.

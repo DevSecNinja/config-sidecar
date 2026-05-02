@@ -10,8 +10,8 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 
-	"github.com/home-operations/gatus-sidecar/internal/config"
-	"github.com/home-operations/gatus-sidecar/internal/state"
+	"github.com/home-operations/config-sidecar/internal/config"
+	"github.com/home-operations/config-sidecar/internal/state"
 )
 
 // dockerClient is the subset of the Docker API used by the controller.

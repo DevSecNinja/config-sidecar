@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/home-operations/gatus-sidecar/internal/endpoint"
-	gatusprovider "github.com/home-operations/gatus-sidecar/internal/provider/gatus"
+	"github.com/home-operations/config-sidecar/internal/endpoint"
+	gatusprovider "github.com/home-operations/config-sidecar/internal/provider/gatus"
 )
 
 func newTestManager(t *testing.T) *Manager {

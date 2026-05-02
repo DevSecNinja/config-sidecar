@@ -3,8 +3,8 @@ package httproute
 import (
 	"testing"
 
-	"github.com/home-operations/gatus-sidecar/internal/config"
-	"github.com/home-operations/gatus-sidecar/internal/endpoint"
+	"github.com/home-operations/config-sidecar/internal/config"
+	"github.com/home-operations/config-sidecar/internal/endpoint"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"

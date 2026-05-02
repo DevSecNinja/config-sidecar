@@ -8,8 +8,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/home-operations/gatus-sidecar/internal/config"
-	"github.com/home-operations/gatus-sidecar/internal/endpoint"
+	"github.com/home-operations/config-sidecar/internal/config"
+	"github.com/home-operations/config-sidecar/internal/endpoint"
 )
 
 var hostRegex = regexp.MustCompile("Host\\(`([^`]+)`\\)")
