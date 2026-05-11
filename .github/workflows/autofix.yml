@@ -1,0 +1,24 @@
+---
+name: Auto-fix formatting
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: autofix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  autofix:
+    # renovate: datasource=github-tags depName=DevSecNinja/.github
+    uses: DevSecNinja/.github/.github/workflows/autofix.yml@52ead33a69740e725ec35d4d92304571be0ad3df # main
+    permissions:
+      contents: write
+    with:
+      # renovate: datasource=github-releases depName=jdx/mise
+      mise-version: "2026.4.22"
+      autofix-dprint: false
+      autofix-shfmt: false
