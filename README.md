@@ -2,6 +2,10 @@
 
 A powerful sidecar that automatically generates configuration files from Kubernetes resources (Ingress, Gateway API HTTPRoute, Service) or Docker containers (via Traefik labels). ⚡
 
+## ⚠️ WARNING
+
+This is a fork of the great `gatus-sidecar` project and has been enhanced with functionality described below. I'm personally only using it in Docker mode and I am automerging Renovate updates to the Kubernetes parts. I hope to find contributors that see the value of these extra functionalities too and are happy to test the functionalities against Kubernetes and test the automerged updates to the Kubernetes-side of the project. Happy to look into any opened PRs or issues with feedback of something that broke.
+
 ## 🔍 Overview
 
 config-sidecar is a lightweight Go application that supports two operating modes and multiple output providers:
@@ -283,7 +287,7 @@ spec:
 
 The resulting endpoint will have both IngressClass and Ingress configurations merged.
 
-### � Custom Configuration via Annotations
+### 🔧 Custom Configuration via Annotations
 
 You can override the default configuration by adding the annotation specified in `--annotation-config` to your Kubernetes resources:
 
@@ -347,7 +351,7 @@ spec:
   # ... rest of Ingress spec
 ```
 
-## � Docker Labels
+## 🏷️ Docker Labels
 
 In Docker mode, container labels control endpoint generation:
 
