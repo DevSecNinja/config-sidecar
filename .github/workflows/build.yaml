@@ -23,6 +23,8 @@ jobs:
     name: Lint
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -41,6 +43,8 @@ jobs:
     name: Test
     if: github.event_name == 'push' || github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && !inputs.run_renovate)
     runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -175,8 +179,9 @@ jobs:
 
   renovate:
     name: Renovate
-    if: (github.event_name == 'workflow_dispatch' && inputs.run_renovate) || (github.event_name == 'push' && (contains(toJSON(github.event.commits), '.renovaterc.json5') || contains(toJSON(github.event.commits), '.renovate/')))
+    if: (github.event_name == 'workflow_dispatch' && inputs.run_renovate) || github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions: {}
     steps:
       - name: Check Renovate changes
         if: github.event_name == 'push'
@@ -187,6 +192,8 @@ jobs:
           changed="$(jq -r '.[] | (.added // [])[], (.modified // [])[], (.removed // [])[]' <<< "$COMMITS")"
           if grep -Eq '^(\.renovaterc\.json5|\.renovate/.*\.json5)$' <<< "$changed"; then
             echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Generate Token
