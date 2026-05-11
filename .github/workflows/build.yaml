@@ -11,12 +11,6 @@ on:
     types:
       - published
   workflow_dispatch:
-    inputs:
-      run_renovate:
-        description: Run Renovate instead of tests
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   lint:
@@ -41,7 +35,7 @@ jobs:
 
   test:
     name: Test
-    if: github.event_name == 'push' || github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && !inputs.run_renovate)
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
@@ -174,52 +168,3 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           docker buildx imagetools inspect ${{ steps.image.outputs.name }}:${{ steps.meta.outputs.version }}
-
-  renovate:
-    name: Renovate
-    if: >-
-      (github.event_name == 'workflow_dispatch' && inputs.run_renovate) ||
-      (github.event_name == 'push' && (
-        contains(toJSON(github.event.commits.*.added), '".renovaterc.json5"') ||
-        contains(toJSON(github.event.commits.*.modified), '".renovaterc.json5"') ||
-        contains(toJSON(github.event.commits.*.removed), '".renovaterc.json5"') ||
-        (contains(toJSON(github.event.commits.*.added), '".renovate/') && contains(toJSON(github.event.commits.*.added), '.json5"')) ||
-        (contains(toJSON(github.event.commits.*.modified), '".renovate/') && contains(toJSON(github.event.commits.*.modified), '.json5"')) ||
-        (contains(toJSON(github.event.commits.*.removed), '".renovate/') && contains(toJSON(github.event.commits.*.removed), '.json5"'))
-      ))
-    runs-on: ubuntu-latest
-    permissions: {}
-    steps:
-      - name: Generate Token
-        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
-        id: app-token
-        with:
-          app-id: ${{ secrets.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-
-      - name: Run Renovate
-        uses: codex-/return-dispatch@16fa9d14771c4d56ae0196bbda1d3c17f7f3650f # v3.0.2
-        id: dispatch
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          owner: ${{ github.repository_owner }}
-          repo: .github
-          ref: main
-          workflow: renovate.yaml
-          workflow_inputs: |-
-            { "autodiscoverFilter": "${{ github.event.repository.name }}" }
-
-      - name: Await Renovate Completion
-        uses: Codex-/await-remote-run@a56c556e6434d2d7ec9438dc656143b39532324e # v1.13.0
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          owner: ${{ github.repository_owner }}
-          repo: .github
-          run_id: ${{ steps.dispatch.outputs.run_id }}
-
-      - name: Renovate Output
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |-
-          gh run view --repo ${{ github.repository_owner }}/.github --log ${{ steps.dispatch.outputs.run_id }}
