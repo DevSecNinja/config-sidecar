@@ -179,7 +179,16 @@ jobs:
 
   renovate:
     name: Renovate
-    if: (github.event_name == 'workflow_dispatch' && inputs.run_renovate) || github.event_name == 'push'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.run_renovate) ||
+      (github.event_name == 'push' && (
+        contains(toJSON(github.event.commits.*.added), '".renovaterc.json5"') ||
+        contains(toJSON(github.event.commits.*.modified), '".renovaterc.json5"') ||
+        contains(toJSON(github.event.commits.*.removed), '".renovaterc.json5"') ||
+        (contains(toJSON(github.event.commits.*.added), '".renovate/') && contains(toJSON(github.event.commits.*.added), '.json5"')) ||
+        (contains(toJSON(github.event.commits.*.modified), '".renovate/') && contains(toJSON(github.event.commits.*.modified), '.json5"')) ||
+        (contains(toJSON(github.event.commits.*.removed), '".renovate/') && contains(toJSON(github.event.commits.*.removed), '.json5"'))
+      ))
     runs-on: ubuntu-latest
     permissions: {}
     steps:
