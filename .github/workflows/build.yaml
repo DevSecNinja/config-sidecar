@@ -192,21 +192,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     steps:
-      - name: Check Renovate changes
-        if: github.event_name == 'push'
-        id: changes
-        env:
-          COMMITS: ${{ toJSON(github.event.commits) }}
-        run: |-
-          changed="$(jq -r '.[] | (.added // [])[], (.modified // [])[], (.removed // [])[]' <<< "$COMMITS")"
-          if grep -Eq '^(\.renovaterc\.json5|\.renovate/.*\.json5)$' <<< "$changed"; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Generate Token
-        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.run == 'true'
         uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
         id: app-token
         with:
@@ -215,7 +201,6 @@ jobs:
           owner: ${{ github.repository_owner }}
 
       - name: Run Renovate
-        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.run == 'true'
         uses: codex-/return-dispatch@16fa9d14771c4d56ae0196bbda1d3c17f7f3650f # v3.0.2
         id: dispatch
         with:
@@ -228,7 +213,6 @@ jobs:
             { "autodiscoverFilter": "${{ github.event.repository.name }}" }
 
       - name: Await Renovate Completion
-        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.run == 'true'
         uses: Codex-/await-remote-run@a56c556e6434d2d7ec9438dc656143b39532324e # v1.13.0
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -237,7 +221,6 @@ jobs:
           run_id: ${{ steps.dispatch.outputs.run_id }}
 
       - name: Renovate Output
-        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.run == 'true'
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |-
