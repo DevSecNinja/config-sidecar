@@ -52,7 +52,7 @@ func (c *Controller) initialSync(ctx context.Context, cfg *config.Config) error 
 	changed := false
 	for _, ctr := range containers {
 		labels := ctr.Labels
-		if !hasTraefikRouter(labels) && labels["gatus.url"] == "" {
+		if !hasTraefikRouter(labels) && labels[gatusURLLabel] == "" {
 			continue
 		}
 		if !isEnabled(labels, cfg.LabelEnabled) {
@@ -136,7 +136,7 @@ func (c *Controller) handleEvent(ctx context.Context, cfg *config.Config, event 
 		}
 
 		labels := info.Config.Labels
-		if !hasTraefikRouter(labels) && labels["gatus.url"] == "" {
+		if !hasTraefikRouter(labels) && labels[gatusURLLabel] == "" {
 			return
 		}
 		if !isEnabled(labels, cfg.LabelEnabled) {
@@ -167,5 +167,5 @@ func containerName(names []string) string {
 	if len(names) > 0 {
 		return names[0]
 	}
-	return "unknown"
+	return unknownContainerName
 }

@@ -1,16 +1,11 @@
----
 name: Auto-fix formatting
-
 on:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: autofix-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   autofix:
     # renovate: datasource=github-tags depName=DevSecNinja/.github

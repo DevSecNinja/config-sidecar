@@ -31,7 +31,7 @@ linters:
     rules:
       - path: (.+)_test.go
         linters:
-        - goconst
+          - goconst
       - linters:
           - lll
         path: api/*

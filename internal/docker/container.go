@@ -14,11 +14,23 @@ import (
 
 var hostRegex = regexp.MustCompile("Host\\(`([^`]+)`\\)")
 
+const (
+	gatusLabelPrefix        = "gatus."
+	gatusHeadersLabelPrefix = "gatus.headers."
+	gatusURLLabel           = "gatus.url"
+	defaultHTTPCondition    = "[STATUS] == 200"
+	protocolHTTPS           = "https"
+	stringValueTrue         = "true"
+	stringValueFalse        = "false"
+	stringValueZero         = "0"
+	unknownContainerName    = "unknown"
+)
+
 // extractURL determines the URL for a container from its labels.
 // If a "gatus.url" label exists, it is used directly.
 // Otherwise, it scans for Traefik router rules to extract the hostname and protocol.
 func extractURL(labels map[string]string, defaultProtocol string) string {
-	if url, ok := labels["gatus.url"]; ok && url != "" {
+	if url, ok := labels[gatusURLLabel]; ok && url != "" {
 		return url
 	}
 
@@ -48,16 +60,16 @@ func extractURL(labels map[string]string, defaultProtocol string) string {
 	if routerName != "" {
 		// Check for explicit TLS
 		tlsKey := "traefik.http.routers." + routerName + ".tls"
-		if tlsVal, ok := labels[tlsKey]; ok && (tlsVal == "true" || tlsVal == "") {
-			protocol = "https"
+		if tlsVal, ok := labels[tlsKey]; ok && (tlsVal == stringValueTrue || tlsVal == "") {
+			protocol = protocolHTTPS
 		}
 
 		// Check entrypoints for websecure/https
 		epKey := "traefik.http.routers." + routerName + ".entrypoints"
 		if epVal, ok := labels[epKey]; ok {
 			lower := strings.ToLower(epVal)
-			if strings.Contains(lower, "websecure") || strings.Contains(lower, "https") {
-				protocol = "https"
+			if strings.Contains(lower, "websecure") || strings.Contains(lower, protocolHTTPS) {
+				protocol = protocolHTTPS
 			}
 		}
 	}
@@ -71,7 +83,7 @@ func isEnabled(labels map[string]string, enabledLabel string) bool {
 	if !ok {
 		return true
 	}
-	return val != "false" && val != "0"
+	return val != stringValueFalse && val != stringValueZero
 }
 
 // hasTraefikRouter returns true if any label matches a Traefik HTTP router rule pattern.
@@ -100,7 +112,7 @@ func buildEndpoint(name string, labels map[string]string, cfg *config.Config) *e
 		Group:      cfg.DockerDefaultGroup,
 		URL:        url,
 		Interval:   cfg.DefaultInterval.String(),
-		Conditions: []string{"[STATUS] == 200"},
+		Conditions: []string{defaultHTTPCondition},
 	}
 
 	// Handle deprecated gatus.endpoint blob label
@@ -126,19 +138,16 @@ func buildEndpoint(name string, labels map[string]string, cfg *config.Config) *e
 // applyGatusLabels applies individual gatus.* labels to the endpoint.
 // Labels handled elsewhere (gatus.url, gatus.enabled, gatus.group, gatus.endpoint) are skipped.
 func applyGatusLabels(e *endpoint.Endpoint, labels map[string]string, cfg *config.Config) {
-	const prefix = "gatus."
-	const headersPrefix = "gatus.headers."
-
 	// Labels handled elsewhere – skip them in this scan.
 	reserved := map[string]bool{
-		"gatus.url":      true,
+		gatusURLLabel:    true,
 		cfg.LabelEnabled: true, // e.g. "gatus.enabled"
 		cfg.LabelGroup:   true, // e.g. "gatus.group"
 		cfg.LabelConfig:  true, // e.g. "gatus.endpoint" (deprecated blob)
 	}
 
 	for key, value := range labels {
-		if !strings.HasPrefix(key, prefix) {
+		if !strings.HasPrefix(key, gatusLabelPrefix) {
 			continue
 		}
 		if reserved[key] {
@@ -146,8 +155,8 @@ func applyGatusLabels(e *endpoint.Endpoint, labels map[string]string, cfg *confi
 		}
 
 		// Handle gatus.headers.* – assemble the headers map from dot-separated keys.
-		if strings.HasPrefix(key, headersPrefix) {
-			headerKey := strings.TrimPrefix(key, headersPrefix)
+		if strings.HasPrefix(key, gatusHeadersLabelPrefix) {
+			headerKey := strings.TrimPrefix(key, gatusHeadersLabelPrefix)
 			if headerKey != "" {
 				if e.Headers == nil {
 					e.Headers = make(map[string]string)
@@ -157,7 +166,7 @@ func applyGatusLabels(e *endpoint.Endpoint, labels map[string]string, cfg *confi
 			continue
 		}
 
-		suffix := strings.TrimPrefix(key, prefix)
+		suffix := strings.TrimPrefix(key, gatusLabelPrefix)
 		switch suffix {
 		case "interval":
 			e.Interval = value
@@ -166,7 +175,7 @@ func applyGatusLabels(e *endpoint.Endpoint, labels map[string]string, cfg *confi
 		case "body":
 			e.Body = value
 		case "graphql":
-			e.GraphQL = value == "true"
+			e.GraphQL = value == stringValueTrue
 		case "conditions":
 			var conditions []string
 			if err := json.Unmarshal([]byte(value), &conditions); err != nil {

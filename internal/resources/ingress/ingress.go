@@ -21,13 +21,15 @@ const (
 	dnsTestURL            = "1.1.1.1"
 	dnsEmptyBodyCondition = "len([BODY]) == 0"
 	dnsQueryType          = "A"
+	networkingAPIGroup    = "networking.k8s.io"
+	defaultHTTPCondition  = "[STATUS] == 200"
 )
 
 // Definition creates a resource definition for Ingress resources
 func Definition() *resources.ResourceDefinition {
 	return &resources.ResourceDefinition{
 		GVR: schema.GroupVersionResource{
-			Group:    "networking.k8s.io",
+			Group:    networkingAPIGroup,
 			Version:  "v1",
 			Resource: "ingresses",
 		},
@@ -77,7 +79,7 @@ func urlExtractor(obj metav1.Object) string {
 }
 
 func conditionFunc(cfg *config.Config, obj metav1.Object, e *endpoint.Endpoint) {
-	e.Conditions = []string{"[STATUS] == 200"}
+	e.Conditions = []string{defaultHTTPCondition}
 }
 
 func guardedFunc(obj metav1.Object, e *endpoint.Endpoint) {
@@ -152,7 +154,7 @@ func parentExtractor(ctx context.Context, obj metav1.Object, client dynamic.Inte
 	}
 
 	gvr := schema.GroupVersionResource{
-		Group:    "networking.k8s.io",
+		Group:    networkingAPIGroup,
 		Version:  "v1",
 		Resource: "ingressclasses",
 	}

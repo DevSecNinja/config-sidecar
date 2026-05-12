@@ -1,6 +1,4 @@
----
 name: Lint
-
 on:
   pull_request:
     branches:
@@ -9,14 +7,11 @@ on:
     branches:
       - main
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
 jobs:
   lint:
     # renovate: datasource=github-tags depName=DevSecNinja/.github
@@ -28,7 +23,7 @@ jobs:
       # renovate: datasource=github-releases depName=jdx/mise
       mise-version: "2026.4.22"
       # renovate: datasource=github-releases depName=golangci/golangci-lint
-      golangci-lint-version: "v2.11.4"
+      golangci-lint-version: "v2.12.2"
       lint-dprint: false
       lint-yamllint: false
       lint-gitleaks: false

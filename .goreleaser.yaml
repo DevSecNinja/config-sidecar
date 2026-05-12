@@ -1,12 +1,9 @@
----
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
 project_name: config-sidecar
-
 before:
   hooks:
     - go mod tidy
-
 builds:
   - id: config-sidecar
     env:
@@ -27,7 +24,6 @@ builds:
         goarch: arm64
     main: ./cmd/root.go
     binary: config-sidecar
-
 archives:
   - id: config-sidecar
     ids:
@@ -35,7 +31,6 @@ archives:
     format_overrides:
       - goos: windows
         formats: ['zip']
-
 upx:
   - enabled: true
     compress: best

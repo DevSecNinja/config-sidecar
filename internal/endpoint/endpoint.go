@@ -5,6 +5,13 @@ import (
 	"maps"
 )
 
+const (
+	fieldName       = "name"
+	fieldHeaders    = "headers"
+	fieldConditions = "conditions"
+	fieldDNS        = "dns"
+)
+
 // Endpoint represents the configuration for a single endpoint.
 // All Gatus endpoint fields are explicitly declared; unknown keys are rejected.
 type Endpoint struct {
@@ -39,7 +46,7 @@ func (e *Endpoint) ApplyTemplate(templateData map[string]any) {
 		switch key {
 		case "enabled":
 			e.setEnabledField(value)
-		case "name":
+		case fieldName:
 			e.setStringField(&e.Name, value)
 		case "group":
 			e.setStringField(&e.Group, value)
@@ -53,19 +60,19 @@ func (e *Endpoint) ApplyTemplate(templateData map[string]any) {
 			if v, ok := value.(bool); ok {
 				e.GraphQL = v
 			}
-		case "headers":
+		case fieldHeaders:
 			e.setStringMapField(&e.Headers, value)
 		case "extra-labels":
 			e.setStringMapField(&e.ExtraLabels, value)
 		case "interval":
 			e.setStringField(&e.Interval, value)
-		case "conditions":
+		case fieldConditions:
 			e.setConditionsField(value)
 		case "alerts":
 			e.setSliceOfMapsField(&e.Alerts, value)
 		case "maintenance":
 			e.setSliceOfMapsField(&e.Maintenance, value)
-		case "dns":
+		case fieldDNS:
 			e.setMapField(&e.DNS, value)
 		case "ssh":
 			e.setMapField(&e.SSH, value)
