@@ -14,6 +14,6 @@ jobs:
       contents: write
     with:
       # renovate: datasource=github-releases depName=jdx/mise
-      mise-version: "2026.4.22"
+      mise-version: "2026.5.8"
       autofix-dprint: false
       autofix-shfmt: false
