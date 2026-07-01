@@ -1,3 +1,4 @@
+---
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
 project_name: config-sidecar
@@ -30,7 +31,8 @@ archives:
       - config-sidecar
     format_overrides:
       - goos: windows
-        formats: ['zip']
+        formats:
+          - 'zip'
 upx:
   - enabled: true
     compress: best
