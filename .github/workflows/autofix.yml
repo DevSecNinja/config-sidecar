@@ -6,12 +6,14 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   autofix:
     uses: DevSecNinja/.github/.github/workflows/autofix.yml@42b7c72b7ea3a1ba0002e0bec84a86cb8a8f896a # main
     permissions:
       contents: write
+      actions: write
     with:
       # renovate: datasource=github-releases depName=jdx/mise
       mise-version: "2026.6.9"
